@@ -14,8 +14,13 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    # Load medieval theme CSS
-    from src.ui.themes import load_css
+    # Load medieval theme CSS and sound system
+    from src.ui.themes import (
+        load_css,
+        render_background_music,
+        render_pending_sfx,
+        render_sound_controls,
+    )
     load_css()
 
     # Session state defaults
@@ -28,17 +33,23 @@ def main() -> None:
     page = st.session_state["page"]
 
     if page == "home" or page == "lobby_waiting":
-        from src.ui.pages.home import render_home_page
+        from src.ui.views.home import render_home_page
         render_home_page()
     elif page == "game":
-        from src.ui.pages.game import render_game_page
+        from src.ui.views.game import render_game_page
         render_game_page()
     elif page == "results":
-        from src.ui.pages.results import render_results_page
+        from src.ui.views.results import render_results_page
         render_results_page()
     else:
         st.session_state["page"] = "home"
         st.rerun()
+
+    # Sound system (sidebar controls + pending SFX + background music)
+    render_sound_controls()
+    render_pending_sfx()
+    game_mode = st.session_state.get("game_mode")
+    render_background_music(page, game_mode)
 
 
 if __name__ == "__main__":

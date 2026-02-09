@@ -9,6 +9,7 @@ from src.database.lobby import LobbyManager
 from src.database.player import PlayerManager
 from src.database.game_state import GameStateManager
 from src.ui.themes.animations import render_victory_animation
+from src.ui.themes.sounds import play_sfx
 
 
 def render_results_page() -> None:
@@ -45,6 +46,9 @@ def render_results_page() -> None:
 
     if winner:
         render_victory_animation(winner.username)
+        if not ss.get("_victory_sfx_played"):
+            play_sfx("victory")
+            ss["_victory_sfx_played"] = True
     else:
         st.title("Game Over")
 
@@ -113,6 +117,7 @@ def _play_again(lobby_mgr, gs_mgr, player_mgr, lobby, players):
 
     ss["page"] = "lobby_waiting"
     ss["_prior_roll_score"] = 0
+    ss.pop("_victory_sfx_played", None)
     st.rerun()
 
 
@@ -121,7 +126,7 @@ def _return_home():
     ss = st.session_state
     keys_to_clear = [
         "lobby_id", "player_id", "username", "is_host",
-        "_prior_roll_score", "_last_turn_index",
+        "_prior_roll_score", "_last_turn_index", "_victory_sfx_played",
     ]
     for key in keys_to_clear:
         ss.pop(key, None)

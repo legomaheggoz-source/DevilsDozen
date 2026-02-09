@@ -23,6 +23,7 @@ from src.ui.themes.animations import (
     render_score_popup,
     render_tier_indicator,
 )
+from src.ui.themes.sounds import play_sfx
 
 
 def _managers():
@@ -86,6 +87,7 @@ def render_game_page() -> None:
         return
 
     game_mode = lobby.game_mode
+    ss["game_mode"] = game_mode  # Store for background music in app.py
     is_d20 = game_mode == "alchemists_ascent"
     current_turn_index = lobby.current_turn_index
     active_player = players[current_turn_index] if current_turn_index < len(players) else players[0]
@@ -112,6 +114,12 @@ def render_game_page() -> None:
             name, color = tier_map[tier_obj]
             render_tier_indicator(name, color)
 
+            # Detect tier advancement
+            prev_tier = ss.get("_last_tier")
+            if prev_tier is not None and tier_obj.value > prev_tier:
+                play_sfx("tier_advance")
+            ss["_last_tier"] = tier_obj.value
+
         render_scoreboard(
             players=players,
             current_turn_index=current_turn_index,
@@ -131,6 +139,7 @@ def render_game_page() -> None:
         # Hot dice banner
         if _check_hot_dice(game_state, game_mode):
             render_hot_dice_animation()
+            play_sfx("hot_dice")
 
         # Dice tray
         scoring = _get_scoring_indices(game_state, game_mode)
@@ -232,6 +241,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
 
         if tier == Tier.BLUE:
             # Tier 3: auto-apply result
+            play_sfx("dice_roll")
             _handle_tier3_roll(roll, current_score, active_player, players, gs_mgr, lobby, lobby_id)
             return
 
@@ -248,6 +258,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                 tier=tier.value,
                 previous_dice=dice_values,
             )
+            play_sfx("dice_roll")
         else:
             # Tier 1: standard scoring with hold mechanic
             result = AlchemistsAscentEngine.calculate_score(roll.values, tier)
@@ -263,6 +274,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                     tier=tier.value,
                     previous_dice=dice_values,
                 )
+                play_sfx("bust")
             else:
                 # Don't auto-score — let the player choose via hold buttons
                 ss["_prior_roll_score"] = game_state.turn_score
@@ -276,6 +288,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                     tier=tier.value,
                     previous_dice=dice_values,
                 )
+                play_sfx("dice_roll")
     else:
         # D6 mode
         # Before rolling, commit current turn_score as the prior baseline
@@ -303,6 +316,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                 roll_count=game_state.roll_count + 1,
             )
             ss["_prior_roll_score"] = 0
+            play_sfx("bust")
         else:
             # Keep the existing turn_score (held dice scores already added)
             gs_mgr.update(
@@ -313,6 +327,7 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                 is_bust=False,
                 roll_count=game_state.roll_count + 1,
             )
+            play_sfx("dice_roll")
 
     st.rerun()
 
@@ -417,6 +432,7 @@ def _handle_d20_reroll(toggled, game_state, gs_mgr, lobby):
             is_bust=True,
             previous_dice=list(previous_values),
         )
+        play_sfx("bust")
     else:
         # Recalculate score with updated dice
         result = AlchemistsAscentEngine.calculate_score_tier2(new_dice)
@@ -427,6 +443,7 @@ def _handle_d20_reroll(toggled, game_state, gs_mgr, lobby):
             is_bust=False,
             previous_dice=list(previous_values),
         )
+        play_sfx("dice_roll")
 
     st.rerun()
 
@@ -452,6 +469,7 @@ def _handle_bank(game_state, gs_mgr, lobby_mgr, player_mgr, lobby, players, play
 
     new_total = active_player.total_score + turn_score
     player_mgr.update_score(str(active_player.id), new_total)
+    play_sfx("bank")
 
     # Check win
     target = lobby.win_condition
