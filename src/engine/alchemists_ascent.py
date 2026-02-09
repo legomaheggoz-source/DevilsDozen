@@ -185,18 +185,17 @@ class AlchemistsAscentEngine:
         """
         Calculate score for Tier 2 (Green) rules.
 
-        Same as Tier 1 but with 5× multiplier on all points.
+        Uses the same Tier 1 scoring rules (pairs, sequences, singles 1/5)
+        but with a 5× multiplier on all points. Tier 2 never busts on a
+        roll — busting only happens on a failed reroll (handled separately).
 
         Args:
             dice: Dice values to score
 
         Returns:
-            ScoringResult with 5× multiplied points
+            ScoringResult with Tier 1 scoring × 5 multiplier
         """
         base_result = cls.calculate_score_tier1(dice)
-
-        if base_result.is_bust:
-            return base_result
 
         # Apply 5× multiplier to all points
         multiplied_breakdown = tuple(
@@ -209,8 +208,11 @@ class AlchemistsAscentEngine:
             for item in base_result.breakdown
         )
 
+        total = base_result.points * cls.TIER_2_MULTIPLIER
+
+        # Tier 2 never busts on a roll — player can always reroll
         return ScoringResult(
-            points=base_result.points * cls.TIER_2_MULTIPLIER,
+            points=total,
             breakdown=multiplied_breakdown,
             scoring_dice_indices=base_result.scoring_dice_indices,
             is_bust=False
@@ -328,8 +330,15 @@ class AlchemistsAscentEngine:
             count = remaining[face_value]
 
             if count >= 3:
-                # Three or more of a kind: sum of dice
-                points = face_value * count
+                # 1s and 5s: pair value doubled for each die beyond 2
+                # (pair of 1s=10, three=20, four=40; pair of 5s=20, three=40, four=80)
+                # Other numbers: sum of dice values
+                if face_value == 1:
+                    points = 10 * (2 ** (count - 2))
+                elif face_value == 5:
+                    points = 20 * (2 ** (count - 2))
+                else:
+                    points = face_value * count
                 set_indices = cls._find_indices_for_value(values, face_value, count)
                 indices.update(set_indices)
                 remaining[face_value] = 0
@@ -338,7 +347,7 @@ class AlchemistsAscentEngine:
                     category=ScoringCategory.THREE_OF_A_KIND,
                     dice_values=tuple([face_value] * count),
                     points=points,
-                    description=f"{count}× {face_value}s (sum)"
+                    description=f"{count}× {face_value}s"
                 ))
 
             elif count == 2:
@@ -468,17 +477,11 @@ class AlchemistsAscentEngine:
         if new_value is None:
             new_value = random.randint(1, 20)
 
-        is_bust = new_value < old_value
+        is_bust = new_value <= old_value
 
-        # Calculate what the new value would be worth (if not bust)
+        # In Tier 2, every die scores face value × multiplier
         if not is_bust:
-            # Simple scoring for single die
-            if new_value == 1:
-                points = 1 * cls.TIER_2_MULTIPLIER
-            elif new_value == 5:
-                points = 5 * cls.TIER_2_MULTIPLIER
-            else:
-                points = 0  # Single non-1/5 doesn't score alone
+            points = new_value * cls.TIER_2_MULTIPLIER
         else:
             points = 0
 

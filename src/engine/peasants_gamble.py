@@ -107,12 +107,12 @@ class PeasantsGambleEngine:
             scoring_indices.update(straight_result[1])
 
         # Check for sets (three or more of a kind)
-        sets_result = cls._check_sets(values, remaining_counts)
+        sets_result = cls._check_sets(values, remaining_counts, scoring_indices)
         breakdown.extend(sets_result[0])
         scoring_indices.update(sets_result[1])
 
         # Check remaining singles (1s and 5s)
-        singles_result = cls._check_singles(values, remaining_counts)
+        singles_result = cls._check_singles(values, remaining_counts, scoring_indices)
         breakdown.extend(singles_result[0])
         scoring_indices.update(singles_result[1])
 
@@ -196,7 +196,8 @@ class PeasantsGambleEngine:
     def _check_sets(
         cls,
         values: tuple[int, ...],
-        remaining: Counter[int]
+        remaining: Counter[int],
+        claimed: set[int] | None = None,
     ) -> tuple[list[ScoringBreakdown], set[int]]:
         """
         Check for three or more of a kind.
@@ -206,6 +207,7 @@ class PeasantsGambleEngine:
         """
         breakdown: list[ScoringBreakdown] = []
         indices: set[int] = set()
+        exclude = (claimed or set()) | indices
 
         for face_value in range(1, 7):
             count = remaining[face_value]
@@ -231,9 +233,12 @@ class PeasantsGambleEngine:
                 else:
                     category = ScoringCategory.SIX_OF_A_KIND
 
-                # Find indices
-                set_indices = cls._find_indices_for_value(values, face_value, count)
+                # Find indices, excluding those already claimed
+                set_indices = cls._find_indices_for_value(
+                    values, face_value, count, exclude=exclude
+                )
                 indices.update(set_indices)
+                exclude = (claimed or set()) | indices
                 remaining[face_value] = 0
 
                 breakdown.append(ScoringBreakdown(
@@ -249,7 +254,8 @@ class PeasantsGambleEngine:
     def _check_singles(
         cls,
         values: tuple[int, ...],
-        remaining: Counter[int]
+        remaining: Counter[int],
+        claimed: set[int] | None = None,
     ) -> tuple[list[ScoringBreakdown], set[int]]:
         """
         Check for remaining single 1s and 5s.
@@ -258,13 +264,16 @@ class PeasantsGambleEngine:
         """
         breakdown: list[ScoringBreakdown] = []
         indices: set[int] = set()
+        # Exclude indices already claimed by straights/sets
+        exclude = (claimed or set()) | indices
 
         # Check for 1s
         ones_count = remaining[1]
         if ones_count > 0:
             points = ones_count * cls.SINGLE_ONE_POINTS
-            ones_indices = cls._find_indices_for_value(values, 1, ones_count, exclude=indices)
+            ones_indices = cls._find_indices_for_value(values, 1, ones_count, exclude=exclude)
             indices.update(ones_indices)
+            exclude = (claimed or set()) | indices
             remaining[1] = 0
 
             breakdown.append(ScoringBreakdown(
@@ -278,7 +287,7 @@ class PeasantsGambleEngine:
         fives_count = remaining[5]
         if fives_count > 0:
             points = fives_count * cls.SINGLE_FIVE_POINTS
-            fives_indices = cls._find_indices_for_value(values, 5, fives_count, exclude=indices)
+            fives_indices = cls._find_indices_for_value(values, 5, fives_count, exclude=exclude)
             indices.update(fives_indices)
             remaining[5] = 0
 

@@ -245,4 +245,15 @@ pytest tests/database/ -v
 
 > This section is updated during implementation. Check here before starting work.
 
-[Empty until implementation begins]
+### Implementation Complete (2026-02-09)
+
+- **All 5 database modules implemented and tested end-to-end.**
+- Supabase project: `qicuqrjxdynhoxajzxde` (credentials in `.env`)
+- Supabase key format changed: now uses `sb_publishable_` prefix (not `eyJ`). Works fine with `supabase>=2.27.3`.
+- Schema deployed via SQL Editor (3 tables, indexes, RLS with permissive policies for MVP).
+- Realtime enabled on all 3 tables via `ALTER PUBLICATION supabase_realtime ADD TABLE`.
+- Python 3.12.8 on Windows. `supabase==2.27.3` installed.
+- `client.table("name")` API works as documented. `.insert()`, `.select()`, `.update()`, `.delete()` all return `.data` list.
+- Cascade delete works: deleting a lobby removes its players and game_state.
+- `count="exact"` param on `.select()` populates `.count` on response.
+- `_generate_code()` uses `secrets.choice` with ambiguous chars (O, I, 0, 1) removed.

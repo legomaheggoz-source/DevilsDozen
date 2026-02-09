@@ -4,4 +4,6 @@ Devil's Dozen Configuration.
 Environment variables, settings, and logging configuration.
 """
 
-# Exports will be added as modules are implemented
+from src.config.settings import Settings, get_settings
+
+__all__ = ["Settings", "get_settings"]

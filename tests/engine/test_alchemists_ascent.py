@@ -145,12 +145,20 @@ class TestTier2Multiplier:
         assert result.points == 25  # 5 * 5
 
     def test_tier2_pair_of_eights_scores_40(self):
+        # Tier 1 pair of 8s = 8 pts → × 5 = 40
         result = AlchemistsAscentEngine.calculate_score_tier2((8, 8))
-        assert result.points == 40  # 8 * 5
+        assert result.points == 40
 
     def test_tier2_sequence_scores_50(self):
+        # Tier 1 sequence 3-4-5 = 10 pts → × 5 = 50
         result = AlchemistsAscentEngine.calculate_score_tier2((3, 4, 5))
-        assert result.points == 50  # 10 * 5
+        assert result.points == 50
+
+    def test_tier2_no_scoring_combos_not_bust(self):
+        # No combos (12, 19, 16) → 0 pts but NOT a bust
+        result = AlchemistsAscentEngine.calculate_score_tier2((12, 19, 16))
+        assert result.points == 0
+        assert result.is_bust is False
 
     def test_tier2_breakdown_shows_multiplier(self):
         result = AlchemistsAscentEngine.calculate_score_tier2((1,))
@@ -220,13 +228,14 @@ class TestTier2Reroll:
         assert result.old_value == 15
         assert result.new_value == 10
 
-    def test_reroll_equal_is_success(self):
+    def test_reroll_equal_is_bust(self):
+        # Same value counts as bust (must be strictly higher)
         result = AlchemistsAscentEngine.process_reroll(
             die_index=0,
             previous_values=(10, 10, 10),
             new_value=10
         )
-        assert result.is_bust is False
+        assert result.is_bust is True
 
     def test_reroll_generates_value_if_none(self):
         result = AlchemistsAscentEngine.process_reroll(

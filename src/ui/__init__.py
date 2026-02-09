@@ -1,7 +1,5 @@
-"""
-Devil's Dozen UI Layer.
+"""Devil's Dozen UI package."""
 
-Streamlit-based interface with medieval theming and animations.
-"""
+from src.ui.app import main as run_app
 
-# Exports will be added as modules are implemented
+__all__ = ["run_app"]

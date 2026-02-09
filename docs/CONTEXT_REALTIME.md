@@ -230,4 +230,15 @@ def test_subscription(mock_client):
 
 > This section is updated during implementation. Check here before starting work.
 
-[Empty until implementation begins]
+### Implementation Complete (2026-02-09)
+
+- **All 3 realtime modules implemented:** `events.py`, `subscriptions.py`, `sync_manager.py`.
+- **Critical: Sync Realtime client is NOT implemented** in `supabase==2.27.3`. All methods on `SyncRealtimeClient` raise `NotImplementedError`. Only the async `AsyncRealtimeClient` / `AsyncRealtimeChannel` works.
+- **Threading bridge:** `ChannelManager` runs an asyncio event loop in a daemon thread (`realtime-loop`) to bridge async WebSocket API with Streamlit's sync execution model. `subscribe()` and `unsubscribe()` are sync methods that dispatch to the background loop via `asyncio.run_coroutine_threadsafe()`.
+- **Channel per table:** Each lobby subscription creates 3 channels (lobbies, players, game_state), each filtered by lobby_id. Channel naming: `lobby:{lobby_id}:{table}`.
+- **Event classification:** Raw postgres_changes payloads are classified into `GameEvent` enum values by comparing `record` vs `old_record` fields. Classifiers in `events.py` for each table.
+- **Polling fallback:** `RealtimeManager.subscribe()` catches WS failures and falls back to a polling thread (configurable interval, default 2s). Polls game_state and lobbies tables, diffs against last known state, emits matching GameEvents.
+- **Async API:** `channel.on_postgres_changes(event="*", callback=..., table=..., schema="public", filter=...)` then `await channel.subscribe()`. Callbacks are sync functions called from the WS message handler.
+- **Payload structure:** `payload["data"]["type"]` = "INSERT"/"UPDATE"/"DELETE", `payload["data"]["record"]` = new row, `payload["data"]["old_record"]` = previous row.
+- **Cleanup:** `ChannelManager.shutdown()` stops the event loop thread. `RealtimeManager.shutdown()` stops both polling and WS.
+- **Thread safety:** Callbacks fire on the background thread. UI layer must handle thread-safety (e.g., writing to `st.session_state` then calling `st.rerun()`).
