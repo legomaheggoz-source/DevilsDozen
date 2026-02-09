@@ -1,3 +1,14 @@
+---
+title: Devil's Dozen
+emoji: 🎲
+colorFrom: red
+colorTo: yellow
+sdk: streamlit
+app_file: src/ui/app.py
+python_version: "3.12"
+pinned: false
+---
+
 # Devil's Dozen 🎲
 
 A medieval-themed multiplayer dice game supporting 2-4 players across two distinct game modes.
