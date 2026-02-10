@@ -88,6 +88,10 @@ def _sync_music_pref() -> None:
     st.session_state["_music_pref"] = st.session_state["_music_widget"]
 
 
+def _sync_volume() -> None:
+    st.session_state["_music_volume"] = st.session_state["_volume_widget"]
+
+
 def render_sound_controls() -> None:
     """Render SFX and music toggles in the sidebar.
 
@@ -113,6 +117,19 @@ def render_sound_controls() -> None:
             on_change=_sync_music_pref,
         )
 
+        st.session_state.setdefault("_music_volume", 30)
+
+        if st.session_state["_music_pref"]:
+            st.slider(
+                "Volume",
+                min_value=0,
+                max_value=100,
+                value=st.session_state["_music_volume"],
+                key="_volume_widget",
+                on_change=_sync_volume,
+                format="%d%%",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Public API — audio system renderer
@@ -129,6 +146,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
     """
     music_enabled = st.session_state.get("_music_pref", True)
     sfx_enabled = st.session_state.get("_sfx_pref", True)
+    volume = st.session_state.get("_music_volume", 30) / 100.0
 
     # --- Determine current music track --------------------------------
     if page in ("home", "lobby_waiting", "results"):
@@ -155,7 +173,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
                 f"dd.music['{track_key}'] = new Audio("
                 f"'data:audio/mpeg;base64,{b64}');\n"
                 f"dd.music['{track_key}'].loop = true;\n"
-                f"dd.music['{track_key}'].volume = 0.3;"
+                f"dd.music['{track_key}'].volume = {volume};"
             )
             loaded.add(track_key)
 
@@ -181,6 +199,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
             f"  if (e[0] !== '{track_key}') e[1].pause();\n"
             f"}});\n"
             f"var cur = dd.music['{track_key}'];\n"
+            f"if (cur) cur.volume = {volume};\n"
             f"if (cur && cur.paused) cur.play().catch(function(){{}});"
         )
     else:
