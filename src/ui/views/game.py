@@ -276,13 +276,20 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
                 )
                 play_sfx("bust")
             else:
-                # Don't auto-score — let the player choose via hold buttons
+                # Auto-hold all scoring dice; player can unhold as desired
                 ss["_prior_roll_score"] = game_state.turn_score
+                auto_held = sorted(
+                    _get_potentially_scoring_indices_d20_t1(dice_values)
+                )
+                held_vals = [dice_values[i] for i in auto_held]
+                held_result = AlchemistsAscentEngine.calculate_score(
+                    held_vals, tier
+                )
                 gs_mgr.update(
                     lobby_id,
                     active_dice=dice_values,
-                    held_indices=[],
-                    turn_score=game_state.turn_score,
+                    held_indices=auto_held,
+                    turn_score=game_state.turn_score + held_result.points,
                     is_bust=False,
                     roll_count=game_state.roll_count + 1,
                     tier=tier.value,
@@ -318,12 +325,13 @@ def _handle_roll(game_state, gs_mgr, lobby, players, player_id):
             ss["_prior_roll_score"] = 0
             play_sfx("bust")
         else:
-            # Keep the existing turn_score (held dice scores already added)
+            # Auto-hold all scoring dice; player can unhold as desired
+            auto_held = sorted(result.scoring_dice_indices)
             gs_mgr.update(
                 lobby_id,
                 active_dice=dice_values,
-                held_indices=[],
-                turn_score=game_state.turn_score,
+                held_indices=auto_held,
+                turn_score=ss["_prior_roll_score"] + result.points,
                 is_bust=False,
                 roll_count=game_state.roll_count + 1,
             )
