@@ -88,12 +88,16 @@ def _sync_music_pref() -> None:
     st.session_state["_music_pref"] = st.session_state["_music_widget"]
 
 
-def _sync_volume() -> None:
-    st.session_state["_music_volume"] = st.session_state["_volume_widget"]
+def _sync_sfx_volume() -> None:
+    st.session_state["_sfx_volume"] = st.session_state["_sfx_vol_widget"]
+
+
+def _sync_music_volume() -> None:
+    st.session_state["_music_volume"] = st.session_state["_music_vol_widget"]
 
 
 def render_sound_controls() -> None:
-    """Render SFX and music toggles in the sidebar.
+    """Render SFX and music toggles with volume sliders in the sidebar.
 
     Uses ``_sfx_pref`` / ``_music_pref`` (non-widget keys) for persistent
     storage so preferences survive page transitions and reruns where the
@@ -103,6 +107,8 @@ def render_sound_controls() -> None:
     with st.sidebar:
         st.session_state.setdefault("_sfx_pref", True)
         st.session_state.setdefault("_music_pref", True)
+        st.session_state.setdefault("_sfx_volume", 50)
+        st.session_state.setdefault("_music_volume", 30)
 
         st.toggle(
             "Sound Effects",
@@ -110,23 +116,31 @@ def render_sound_controls() -> None:
             key="_sfx_widget",
             on_change=_sync_sfx_pref,
         )
+        if st.session_state["_sfx_pref"]:
+            st.slider(
+                "SFX Volume",
+                min_value=0,
+                max_value=100,
+                value=st.session_state["_sfx_volume"],
+                key="_sfx_vol_widget",
+                on_change=_sync_sfx_volume,
+                format="%d%%",
+            )
+
         st.toggle(
             "Music",
             value=st.session_state["_music_pref"],
             key="_music_widget",
             on_change=_sync_music_pref,
         )
-
-        st.session_state.setdefault("_music_volume", 30)
-
         if st.session_state["_music_pref"]:
             st.slider(
-                "Volume",
+                "Music Volume",
                 min_value=0,
                 max_value=100,
                 value=st.session_state["_music_volume"],
-                key="_volume_widget",
-                on_change=_sync_volume,
+                key="_music_vol_widget",
+                on_change=_sync_music_volume,
                 format="%d%%",
             )
 
@@ -147,6 +161,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
     music_enabled = st.session_state.get("_music_pref", True)
     sfx_enabled = st.session_state.get("_sfx_pref", True)
     volume = st.session_state.get("_music_volume", 30) / 100.0
+    sfx_volume = st.session_state.get("_sfx_volume", 50) / 100.0
 
     # --- Determine current music track --------------------------------
     if page in ("home", "lobby_waiting", "results"):
@@ -211,6 +226,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
         control_parts.append(
             f"if (dd.sfx['{sfx_pending}']) {{\n"
             f"  var s = new p.Audio(dd.sfx['{sfx_pending}']);\n"
+            f"  s.volume = {sfx_volume};\n"
             f"  s.play().catch(function(){{}});\n"
             f"}}"
         )
