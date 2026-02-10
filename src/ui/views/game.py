@@ -14,9 +14,11 @@ from src.database.game_state import GameStateManager
 from src.engine.peasants_gamble import PeasantsGambleEngine
 from src.engine.alchemists_ascent import AlchemistsAscentEngine
 from src.engine.base import Tier
+from src.engine.knucklebones import KnuckleboneEngine, GridState
 from src.ui.components.dice_tray import render_dice_tray
 from src.ui.components.scoreboard import render_scoreboard
 from src.ui.components.turn_controls import render_turn_controls
+from src.ui.components.knucklebones_board import render_knucklebones_board
 from src.ui.themes.animations import (
     render_bust_animation,
     render_hot_dice_animation,
@@ -88,6 +90,12 @@ def render_game_page() -> None:
 
     game_mode = lobby.game_mode
     ss["game_mode"] = game_mode  # Store for background music in app.py
+
+    # Route to Knucklebones if that's the game mode
+    if game_mode == "knucklebones":
+        _render_knucklebones_game(lobby, players, game_state, player_id)
+        return
+
     is_d20 = game_mode == "alchemists_ascent"
     current_turn_index = lobby.current_turn_index
     active_player = players[current_turn_index] if current_turn_index < len(players) else players[0]
@@ -673,3 +681,249 @@ def _poll_game_state() -> None:
 
     if needs_rerun:
         st.rerun(scope="app")
+
+
+# === Knucklebones Mode ===
+
+
+def _render_knucklebones_game(lobby, players, game_state, player_id):
+    """Render Knucklebones game mode."""
+    ss = st.session_state
+    lobby_id = str(lobby.id)
+
+    # Knucklebones is always 2-player
+    if len(players) != 2:
+        st.error("Knucklebones requires exactly 2 players.")
+        return
+
+    current_turn_index = lobby.current_turn_index
+    active_player = players[current_turn_index]
+    is_my_turn = str(active_player.id) == player_id
+
+    # Find my turn order (0 or 1)
+    my_turn_order = next((i for i, p in enumerate(players) if str(p.id) == player_id), 0)
+
+    # Convert grids to GridState for score calculation
+    p1_grid = GridState.from_dict(game_state.player1_grid)
+    p2_grid = GridState.from_dict(game_state.player2_grid)
+
+    # Calculate current scores from grids
+    p1_score = KnuckleboneEngine.calculate_grid_score(p1_grid)
+    p2_score = KnuckleboneEngine.calculate_grid_score(p2_grid)
+
+    # --- Layout: board (3) | controls (1) ---
+    board_col, controls_col = st.columns([3, 1])
+
+    with controls_col:
+        st.caption(f"Lobby: **{lobby.code}**")
+
+        # Knucklebones scoreboard
+        st.markdown("### 📊 Scores")
+        for i, player in enumerate(players):
+            score = p1_score if i == 0 else p2_score
+            is_active = i == current_turn_index
+            is_me = str(player.id) == player_id
+
+            css_classes = []
+            if is_active:
+                css_classes.append("active")
+            if is_me:
+                css_classes.append("is-me")
+
+            css_class = " ".join(css_classes)
+            st.markdown(
+                f'<div class="player-row {css_class}">'
+                f'<span class="name">{player.username}</span>'
+                f'<span class="score">{score}</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+        st.divider()
+
+        # Current die display (if rolled)
+        if game_state.current_die_value:
+            st.markdown("### 🎲 Rolled Die")
+            # Use same die styling as D6 mode (just the number, not Unicode)
+            st.markdown(
+                f'<div class="dice-tray" style="min-height: auto; padding: 12px;">'
+                f'<div class="die">{game_state.current_die_value}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+        # Action buttons
+        column_clicked = None
+        if is_my_turn:
+            if game_state.current_die_value is None:
+                # No die rolled yet - show roll button
+                if st.button(
+                    "🎲 Roll Die",
+                    key="roll_kb",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_knucklebones_roll(game_state, lobby_id)
+            else:
+                # Die rolled - show placement buttons
+                st.markdown("**Place in column:**")
+                my_grid = p1_grid if my_turn_order == 0 else p2_grid
+                available_columns = KnuckleboneEngine.get_available_columns(my_grid)
+
+                for col_idx in range(3):
+                    is_full = col_idx not in available_columns
+                    button_label = "FULL" if is_full else f"Column {col_idx + 1}"
+
+                    if st.button(
+                        button_label,
+                        key=f"place_col_{col_idx}",
+                        disabled=is_full,
+                        use_container_width=True,
+                        type="primary" if not is_full else "secondary"
+                    ):
+                        column_clicked = col_idx
+        else:
+            if game_state.current_die_value is None:
+                st.info("Waiting for opponent to roll...")
+            else:
+                st.info("Waiting for opponent to place die...")
+
+        # Handle placement after rendering (outside callback)
+        if column_clicked is not None:
+            _handle_knucklebones_placement(
+                column_clicked,
+                game_state,
+                lobby,
+                players,
+                my_turn_order,
+            )
+
+    with board_col:
+        st.subheader(f"{active_player.username}'s Turn")
+
+        # Render the board (grids only)
+        render_knucklebones_board(
+            player1_grid=game_state.player1_grid,
+            player2_grid=game_state.player2_grid,
+            my_turn_order=my_turn_order,
+            player1_name=players[0].username,
+            player2_name=players[1].username,
+        )
+
+    # Polling fragment for multiplayer sync
+    _poll_game_state()
+
+
+def _handle_knucklebones_roll(game_state, lobby_id):
+    """Roll a single D6 for Knucklebones."""
+    die_value = KnuckleboneEngine.roll_die()
+
+    lobby_mgr, _, gs_mgr = _managers()
+    _db_retry(
+        gs_mgr.update_knucklebones,
+        lobby_id,
+        current_die_value=die_value,
+    )
+
+    play_sfx("dice_roll")
+    st.rerun()
+
+
+def _handle_knucklebones_placement(column_idx, game_state, lobby, players, my_turn_order):
+    """Handle placing a die in a column."""
+    lobby_id = str(lobby.id)
+    die_value = game_state.current_die_value
+
+    if die_value is None:
+        return
+
+    # Convert dicts to GridState
+    p1_grid = GridState.from_dict(game_state.player1_grid)
+    p2_grid = GridState.from_dict(game_state.player2_grid)
+
+    # Determine which grid is player's and which is opponent's
+    if my_turn_order == 0:
+        player_grid = p1_grid
+        opponent_grid = p2_grid
+    else:
+        player_grid = p2_grid
+        opponent_grid = p1_grid
+
+    try:
+        # Place the die
+        result = KnuckleboneEngine.place_die(die_value, column_idx, player_grid, opponent_grid)
+
+        # Update grids in database
+        if my_turn_order == 0:
+            new_p1 = result.player_grid.to_dict()
+            new_p2 = result.opponent_grid.to_dict()
+        else:
+            new_p1 = result.opponent_grid.to_dict()
+            new_p2 = result.player_grid.to_dict()
+
+        lobby_mgr, player_mgr, gs_mgr = _managers()
+
+        # Play appropriate sound
+        if result.destroyed_count > 0:
+            play_sfx("die_destroy")
+        else:
+            play_sfx("place_die")
+
+        # Check if game is over
+        if KnuckleboneEngine.is_game_over(result.player_grid, result.opponent_grid):
+            # Calculate final scores
+            p1_final = KnuckleboneEngine.calculate_grid_score(
+                GridState.from_dict(new_p1)
+            )
+            p2_final = KnuckleboneEngine.calculate_grid_score(
+                GridState.from_dict(new_p2)
+            )
+
+            # Update grids without clearing die yet
+            _db_retry(
+                gs_mgr.update_knucklebones,
+                lobby_id,
+                player1_grid=new_p1,
+                player2_grid=new_p2,
+            )
+
+            # Update player scores
+            _db_retry(player_mgr.update_score, str(players[0].id), p1_final)
+            _db_retry(player_mgr.update_score, str(players[1].id), p2_final)
+
+            # Determine winner
+            winner_idx = KnuckleboneEngine.get_winner(
+                GridState.from_dict(new_p1),
+                GridState.from_dict(new_p2)
+            )
+
+            if winner_idx is not None:
+                winner_id = str(players[winner_idx - 1].id)
+                _db_retry(lobby_mgr.set_winner, lobby_id, winner_id)
+                play_sfx("victory")
+            else:
+                # Tie (no winner)
+                _db_retry(lobby_mgr.update_status, lobby_id, "finished")
+
+            st.session_state["page"] = "results"
+            st.rerun()
+            return
+
+        # Game continues - advance turn FIRST, then clear die
+        new_turn_index = 1 if lobby.current_turn_index == 0 else 0
+        _db_retry(lobby_mgr.advance_turn, lobby_id, new_turn_index)
+
+        # Now update grids and clear the die (so next player sees None)
+        _db_retry(
+            gs_mgr.update_knucklebones,
+            lobby_id,
+            player1_grid=new_p1,
+            player2_grid=new_p2,
+            current_die_value=None,
+        )
+
+        st.rerun()
+
+    except ValueError as e:
+        st.error(f"Cannot place die: {e}")
+        return

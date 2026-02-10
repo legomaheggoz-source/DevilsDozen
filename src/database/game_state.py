@@ -94,6 +94,66 @@ class GameStateManager:
         )
         return GameState.model_validate(data.data[0])
 
+    def update_knucklebones(
+        self,
+        lobby_id: str,
+        **kwargs,
+    ) -> GameState:
+        """
+        Update Knucklebones-specific game state fields.
+
+        Args:
+            lobby_id: The lobby to update
+            player1_grid: Player 1's 3x3 grid (dict with "columns" key)
+            player2_grid: Player 2's 3x3 grid (dict with "columns" key)
+            current_die_value: Currently rolled die value (1-6) or None
+
+        Returns:
+            Updated GameState
+        """
+        updates: dict = {}
+
+        # Use kwargs to distinguish "not provided" from "provided as None"
+        if "player1_grid" in kwargs:
+            updates["player1_grid"] = kwargs["player1_grid"]
+        if "player2_grid" in kwargs:
+            updates["player2_grid"] = kwargs["player2_grid"]
+        if "current_die_value" in kwargs:
+            updates["current_die_value"] = kwargs["current_die_value"]
+
+        if not updates:
+            return self.get(lobby_id)  # type: ignore[return-value]
+
+        data = (
+            self.table
+            .update(updates)
+            .eq("lobby_id", lobby_id)
+            .execute()
+        )
+        return GameState.model_validate(data.data[0])
+
+    def reset_knucklebones(self, lobby_id: str) -> GameState:
+        """
+        Reset Knucklebones state for a new game.
+
+        Args:
+            lobby_id: The lobby to reset
+
+        Returns:
+            Reset GameState
+        """
+        data = (
+            self.table
+            .update({
+                "player1_grid": {"columns": [[], [], []]},
+                "player2_grid": {"columns": [[], [], []]},
+                "current_die_value": None,
+            })
+            .eq("lobby_id", lobby_id)
+            .execute()
+        )
+        return GameState.model_validate(data.data[0])
+
     def delete(self, lobby_id: str) -> None:
         """Delete game state for a lobby."""
         self.table.delete().eq("lobby_id", lobby_id).execute()

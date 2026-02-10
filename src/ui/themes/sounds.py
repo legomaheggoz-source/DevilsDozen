@@ -32,12 +32,15 @@ _SFX_FILES: dict[str, str] = {
     "hot_dice": "hot_dice.mp3",
     "victory": "victory.mp3",
     "tier_advance": "tier_advance.mp3",
+    "die_destroy": "die_destroy.mp3",  # Knucklebones: die destroyed
+    "place_die": "place_die.mp3",      # Knucklebones: die placed (no destruction)
 }
 
 _MUSIC_FILES: dict[str, str] = {
     "menu": "menu_theme.mp3",
     "peasants_gamble": "d6_theme.mp3",
     "alchemists_ascent": "d20_theme.mp3",
+    "knucklebones": "knucklebones_theme.mp3",
 }
 
 # ---------------------------------------------------------------------------

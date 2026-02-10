@@ -39,10 +39,11 @@ def _render_create_form() -> None:
     # Game mode outside the form so target score updates immediately
     game_mode = st.selectbox(
         "Game Mode",
-        options=["peasants_gamble", "alchemists_ascent"],
+        options=["peasants_gamble", "alchemists_ascent", "knucklebones"],
         format_func=lambda m: (
             "Peasant's Gamble (D6)" if m == "peasants_gamble"
-            else "Alchemist's Ascent (D20)"
+            else "Alchemist's Ascent (D20)" if m == "alchemists_ascent"
+            else "Knucklebones (Grid Battle)"
         ),
         key="create_game_mode",
     )
@@ -54,9 +55,13 @@ def _render_create_form() -> None:
             index=1,
             key="create_target_score",
         )
-    else:
+    elif game_mode == "alchemists_ascent":
         target = 250
         st.markdown("**Target Score:** 250 (fixed)")
+    else:  # knucklebones
+        target = 999  # Placeholder (not used; game ends on full grid)
+        st.markdown("**Mode:** 2 players only")
+        st.caption("⚔️ Strategic dice placement with grid destruction")
 
     with st.form("create_lobby_form"):
         username = st.text_input(
@@ -125,8 +130,10 @@ def _render_join_form() -> None:
                 return
 
             count = player_mgr.count_in_lobby(str(lobby.id))
-            if count >= 4:
-                st.error("Lobby is full (max 4 players).")
+            # Check max players (2 for Knucklebones, 4 for others)
+            max_players = 2 if lobby.game_mode == "knucklebones" else 4
+            if count >= max_players:
+                st.error(f"Lobby is full (max {max_players} players).")
                 return
 
             # Check for existing player with same name (reconnect on refresh)
@@ -206,7 +213,8 @@ def _waiting_room_live(lobby_id: str) -> None:
 
     # Player list (re-fetched every poll)
     players = player_mgr.list_by_lobby(lobby_id)
-    st.markdown(f"**Players ({len(players)}/4):**")
+    max_players = 2 if lobby.game_mode == "knucklebones" else 4
+    st.markdown(f"**Players ({len(players)}/{max_players}):**")
 
     for p in players:
         badge = ""

@@ -50,5 +50,35 @@ you bust!
 """
         )
 
+    with st.expander("Knucklebones (Grid Battle) — Rules"):
+        st.markdown(
+            """
+**A 2-player strategic dice placement game!**
+
+**Setup:**
+- Each player has a 3×3 grid
+- Take turns rolling a single D6 and placing it
+
+**The Crunch:**
+- When you place a die, **all matching opponent dice in the same column are destroyed!**
+- Destroyed dice are removed from their grid (and their score)
+
+**Scoring (per column):**
+- **Single die:** face value (e.g., [4] = 4 pts)
+- **Pair (2 of kind):** sum × 2 (e.g., [4, 4] = 16 pts)
+- **Triple (3 of kind):** sum × 3 (e.g., [4, 4, 4] = 36 pts)
+- **Mixed values:** sum only (e.g., [4, 6] = 10 pts)
+
+**Example:** Column with [4, 4, 6] scores (4+4)×2 + 6 = 22 points
+
+**Grid Lock:**
+- Game ends when **any grid is completely full**
+- Highest total score wins!
+- Ties are possible
+
+**No busting, no banking — pure placement strategy!**
+"""
+        )
+
     st.divider()
     render_lobby()

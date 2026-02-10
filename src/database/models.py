@@ -51,6 +51,10 @@ class GameState(BaseModel):
     roll_count: int = 0
     tier: int = 1
     previous_dice: list[int] = Field(default_factory=list)
+    # Knucklebones fields
+    player1_grid: dict = Field(default_factory=lambda: {"columns": [[], [], []]})
+    player2_grid: dict = Field(default_factory=lambda: {"columns": [[], [], []]})
+    current_die_value: int | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}

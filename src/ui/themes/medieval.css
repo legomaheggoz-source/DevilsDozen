@@ -508,3 +508,86 @@ hr {
         font-size: 15px;
     }
 }
+
+/* === Knucklebones Grid === */
+
+.knucklebones-grid {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.knucklebones-grid table {
+    border-collapse: separate;
+    border-spacing: 6px;
+    background: linear-gradient(180deg, var(--bg-medium), var(--bg-dark));
+    padding: 12px;
+    border: 2px solid var(--gold-dark);
+    border-radius: 12px;
+}
+
+.knucklebones-grid td {
+    width: 66px;
+    height: 66px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.knucklebones-grid .die.grid-die {
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
+    margin: 0 auto;
+}
+
+.knucklebones-grid .die.grid-die.empty {
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px dashed var(--gold-dark);
+    color: var(--text-secondary);
+    opacity: 0.3;
+}
+
+.knucklebones-grid .column-scores td {
+    padding: 8px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--gold);
+    background: rgba(201, 168, 76, 0.1);
+    border-radius: 6px;
+}
+
+@keyframes crunch {
+    0% { transform: scale(1) rotate(0deg); opacity: 1; }
+    25% { transform: scale(1.2) rotate(-10deg); opacity: 0.8; }
+    50% { transform: scale(0.8) rotate(10deg); opacity: 0.5; }
+    75% { transform: scale(0.5) rotate(-5deg); opacity: 0.2; }
+    100% { transform: scale(0) rotate(0deg); opacity: 0; }
+}
+
+.die.crunched {
+    animation: crunch 0.6s ease forwards;
+}
+
+/* Responsive - Knucklebones */
+@media (max-width: 768px) {
+    .knucklebones-grid table {
+        border-spacing: 4px;
+        padding: 10px;
+    }
+
+    .knucklebones-grid td {
+        width: 56px;
+        height: 56px;
+    }
+
+    .knucklebones-grid .die.grid-die {
+        width: 52px;
+        height: 52px;
+        font-size: 24px;
+    }
+
+    .knucklebones-grid .column-scores td {
+        font-size: 13px;
+        padding: 4px;
+    }
+}

@@ -50,6 +50,27 @@ _D20_RULES = """\
 - Roll 2-19 = Face value added to score
 """
 
+_KNUCKLEBONES_RULES = """\
+**Goal:** Highest score when any grid fills!
+
+**Gameplay:**
+- 2 players, each with 3×3 grid
+- Roll 1 D6 → Place in any column (if not full)
+- **The Crunch:** Matching opponent dice in same column are destroyed
+- Turn ends automatically after placement
+
+**Scoring (per column):**
+| Combo | Points |
+|---|---|
+| Single die | Face value |
+| Pair (2 of kind) | Sum × 2 |
+| Triple (3 of kind) | Sum × 3 |
+
+**Example:** Column with [4, 4, 6] scores (4+4)×2 + 6 = 22
+
+**Grid Lock:** Game ends when either grid is full!
+"""
+
 
 def _render_sidebar_rules(game_mode: str) -> None:
     """Show rules for the current game mode in the sidebar."""
@@ -61,6 +82,9 @@ def _render_sidebar_rules(game_mode: str) -> None:
         elif game_mode == "alchemists_ascent":
             st.markdown("### Alchemist's Ascent Rules")
             st.markdown(_D20_RULES)
+        elif game_mode == "knucklebones":
+            st.markdown("### Knucklebones Rules")
+            st.markdown(_KNUCKLEBONES_RULES)
 
 
 def main() -> None:

@@ -21,6 +21,7 @@ class GameMode(Enum):
     """Available game modes."""
     PEASANTS_GAMBLE = "peasants_gamble"
     ALCHEMISTS_ASCENT = "alchemists_ascent"
+    KNUCKLEBONES = "knucklebones"
 
 
 class Tier(Enum):
@@ -188,8 +189,14 @@ class GameConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration."""
-        if not 2 <= self.num_players <= 4:
-            raise ValueError("Number of players must be between 2 and 4.")
+        if self.mode == GameMode.KNUCKLEBONES:
+            # Knucklebones is strictly 2-player
+            if self.num_players != 2:
+                raise ValueError("Knucklebones requires exactly 2 players.")
+        else:
+            # Other modes support 2-4 players
+            if not 2 <= self.num_players <= 4:
+                raise ValueError("Number of players must be between 2 and 4.")
 
         if self.mode == GameMode.PEASANTS_GAMBLE:
             valid_targets = {3000, 5000, 10000}
@@ -200,3 +207,6 @@ class GameConfig:
         elif self.mode == GameMode.ALCHEMISTS_ASCENT:
             if self.target_score != 250:
                 raise ValueError("Target score for Alchemist's Ascent must be 250.")
+        elif self.mode == GameMode.KNUCKLEBONES:
+            # Target score is not used in Knucklebones (game ends on full grid)
+            pass
