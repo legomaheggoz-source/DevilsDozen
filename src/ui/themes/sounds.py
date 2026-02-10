@@ -170,7 +170,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
         b64 = _load_audio_b64(_MUSIC_FILES[track_key])
         if b64:
             preload_parts.append(
-                f"dd.music['{track_key}'] = new Audio("
+                f"dd.music['{track_key}'] = new p.Audio("
                 f"'data:audio/mpeg;base64,{b64}');\n"
                 f"dd.music['{track_key}'].loop = true;\n"
                 f"dd.music['{track_key}'].volume = {volume};"
@@ -210,7 +210,7 @@ def render_audio_system(page: str, game_mode: str | None = None) -> None:
     if sfx_pending:
         control_parts.append(
             f"if (dd.sfx['{sfx_pending}']) {{\n"
-            f"  var s = new Audio(dd.sfx['{sfx_pending}']);\n"
+            f"  var s = new p.Audio(dd.sfx['{sfx_pending}']);\n"
             f"  s.play().catch(function(){{}});\n"
             f"}}"
         )
