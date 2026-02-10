@@ -250,34 +250,40 @@ To reduce perceived latency:
 ## 7. Deployment Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  Hugging Face Spaces                         │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │              Streamlit Application                     │  │
-│  │                 (Free Tier)                            │  │
-│  │  - Serves UI                                           │  │
-│  │  - Runs game engine                                    │  │
-│  │  - Connects to Supabase                                │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTPS
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       Supabase                               │
-│                     (Free Tier)                              │
-│  - PostgreSQL database                                       │
-│  - Realtime WebSocket channels                               │
-│  - Row Level Security                                        │
-│  - 500MB storage limit                                       │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────┐       ┌──────────────────────────┐
+│    GitHub (source)       │       │   Hugging Face Spaces    │
+│  origin/master           │       │   hf/main (live app)     │
+└──────────┬───────────────┘       └──────────┬───────────────┘
+           │  git push origin master           │  git push hf master:main
+           └───────────────┬───────────────────┘
+                           │
+              ┌────────────▼────────────────────┐
+              │     Streamlit Application        │
+              │  - Serves UI + game engine       │
+              │  - JS-cached audio system        │
+              │  - Connects to Supabase (HTTPS)  │
+              └────────────┬────────────────────┘
+                           │
+              ┌────────────▼────────────────────┐
+              │          Supabase               │
+              │  - PostgreSQL database           │
+              │  - Realtime WebSocket channels   │
+              │  - Row Level Security            │
+              └─────────────────────────────────┘
 ```
 
-### Environment Variables (Hugging Face Secrets)
+### Remotes
+
+| Remote | URL | Branch |
+|--------|-----|--------|
+| `origin` | `https://github.com/legomaheggoz-source/DevilsDozen.git` | `master` |
+| `hf` | `https://huggingface.co/spaces/legomaheggo/DevilsDozen` | push `master:main` |
+
+### Environment Variables (HF Spaces Secrets / `.env` locally)
 
 ```
 SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=eyJxxx...
+SUPABASE_ANON_KEY=sb_publishable_xxx...
 ```
 
 ---
@@ -292,6 +298,8 @@ SUPABASE_ANON_KEY=eyJxxx...
 | Database round-trips | Batch updates where possible |
 | Realtime subscription limits | One channel per lobby |
 | Animation performance | CSS animations over JS |
+| Audio data re-send on rerun | JS Audio caching in `window.parent` — base64 sent once, then tiny control commands |
+| Widget prefs lost on `st.rerun()` | Non-widget session state keys (`_sfx_pref`, `_music_pref`, etc.) |
 
 ### Scaling Limits (Free Tier)
 

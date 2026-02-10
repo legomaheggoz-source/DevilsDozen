@@ -328,6 +328,61 @@ streamlit run src/ui/app.py
 
 ## Discovered Context
 
-> This section is updated during implementation. Check here before starting work.
+> Updated Feb 2026 after full implementation and playtesting.
 
-[Empty until implementation begins]
+### Actual File Structure
+
+Pages live under `src/ui/views/` (not `src/ui/pages/`). Sound system is in `src/ui/themes/sounds.py`.
+
+| File | Purpose |
+|------|---------|
+| `src/ui/app.py` | Entrypoint — routing, sidebar rules, sound system init |
+| `src/ui/themes/sounds.py` | JS-cached audio system (SFX + music) |
+| `src/ui/themes/animations.py` | CSS/HTML animation helpers |
+| `src/ui/themes/medieval.css` | Full medieval theme CSS |
+| `src/ui/components/dice_tray.py` | Dice display with hold/reroll buttons |
+| `src/ui/components/scoreboard.py` | Player scores panel |
+| `src/ui/components/turn_controls.py` | Roll / Bank / End Turn buttons |
+| `src/ui/components/lobby.py` | Create / Join / Waiting room |
+| `src/ui/views/home.py` | Home + lobby waiting page |
+| `src/ui/views/game.py` | Main game loop with polling |
+| `src/ui/views/results.py` | Victory screen + standings |
+
+### Audio System Architecture
+
+The original approach injected base64 `<audio>` elements via `st.markdown` on every rerun, sending 5-8 MB per cycle. This was replaced with a JS-caching strategy:
+
+1. **First load per track**: base64 data sent via `st.components.v1.html(height=0)`, cached as `window.parent._dd_audio` JS Audio objects using **parent window's Audio constructor** (`new p.Audio(...)`) so objects survive iframe replacement.
+2. **Subsequent reruns**: Only tiny control commands (<1 KB) — play, pause, volume.
+3. **SFX**: Lazy-loaded on first trigger, cached as data URI strings in `window.parent._dd_audio.sfx`.
+4. **Preferences**: Stored in non-widget session state keys (`_sfx_pref`, `_music_pref`, `_sfx_volume`, `_music_volume`) that survive Streamlit's widget lifecycle cleanup during `st.rerun()`.
+
+### Audio Asset Naming Convention
+
+| Type | Key | Filename | Size |
+|------|-----|----------|------|
+| SFX | `dice_roll` | `dice_roll.mp3` | 45 KB |
+| SFX | `bust` | `bust.mp3` | 64 KB |
+| SFX | `bank` | `bank.mp3` | 46 KB |
+| SFX | `hot_dice` | `hot_dice.mp3` | 58 KB |
+| SFX | `victory` | `victory.mp3` | 327 KB |
+| SFX | `tier_advance` | `tier_advance.mp3` | 59 KB |
+| Music | `menu` | `menu_theme.mp3` | 4.3 MB |
+| Music | `peasants_gamble` | `d6_theme.mp3` | 6.5 MB |
+| Music | `alchemists_ascent` | `d20_theme.mp3` | 4.9 MB |
+
+To add new audio: add the file to `assets/sounds/`, add to `_SFX_FILES` or `_MUSIC_FILES` dict in `sounds.py`, and update `.gitattributes` LFS tracking if needed.
+
+### Auto-Hold Scoring Dice
+
+After rolling (D6 and D20 Tier 1), all scoring dice default to "Held". Players uncheck to release. This inverts the original opt-in pattern to opt-out. D20 Tier 2 reroll and Tier 3 auto-apply are unchanged. Implementation is in `_handle_roll()` in `game.py`.
+
+### Sidebar Game Rules
+
+When `page == "game"`, rules for the active game mode are rendered below audio controls in the sidebar. Rules text is defined as module-level constants `_D6_RULES` and `_D20_RULES` in `app.py`.
+
+### Run Command
+
+```bash
+python -m streamlit run src/ui/app.py
+```
