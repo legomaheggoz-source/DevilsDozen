@@ -1,9 +1,14 @@
 """Sound effects and background music for Devil's Dozen.
 
-SFX are base64-encoded and injected as <audio autoplay> via st.markdown.
-Background music uses an HTML <audio autoplay loop controls> element in the
-sidebar so it plays immediately and loops without user interaction.
-A fire-once pattern (_sfx_pending) prevents re-triggering on Streamlit reruns.
+Audio data (base64-encoded MP3) is sent to the browser ONCE per track and
+cached as JavaScript Audio objects in ``window.parent._dd_audio``.  Subsequent
+Streamlit reruns send only tiny control commands (<1 KB) instead of the
+multi-megabyte base64 payloads, eliminating the latency that previously made
+buttons unresponsive.
+
+Preferences (SFX on/off, music on/off) are stored in non-widget session-state
+keys (``_sfx_pref``, ``_music_pref``) so they survive Streamlit's widget-
+lifecycle cleanup during page transitions.
 """
 
 from __future__ import annotations
@@ -12,11 +17,14 @@ import base64
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-# Path to the sounds directory
+# ---------------------------------------------------------------------------
+# Asset paths and mappings
+# ---------------------------------------------------------------------------
+
 _SOUNDS_DIR = Path(__file__).resolve().parents[3] / "assets" / "sounds"
 
-# SFX file mapping: logical name → filename
 _SFX_FILES: dict[str, str] = {
     "dice_roll": "dice_roll.mp3",
     "bust": "bust.mp3",
@@ -26,79 +34,103 @@ _SFX_FILES: dict[str, str] = {
     "tier_advance": "tier_advance.mp3",
 }
 
-# Background music mapping: context → filename
 _MUSIC_FILES: dict[str, str] = {
     "menu": "menu_theme.mp3",
     "peasants_gamble": "d6_theme.mp3",
     "alchemists_ascent": "d20_theme.mp3",
 }
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 
 @st.cache_data(show_spinner=False)
 def _load_audio_b64(filename: str) -> str | None:
     """Read an audio file and return its base64-encoded string.
 
-    Returns None if the file doesn't exist (audio files not yet provided).
+    Returns ``None`` if the file doesn't exist.
     """
     path = _SOUNDS_DIR / filename
     if not path.exists():
         return None
-    data = path.read_bytes()
-    return base64.b64encode(data).decode("ascii")
+    return base64.b64encode(path.read_bytes()).decode("ascii")
 
 
-def _inject_sfx(filename: str) -> None:
-    """Inject a hidden <audio autoplay> element via st.markdown."""
-    b64 = _load_audio_b64(filename)
-    if b64 is None:
-        return
-    st.markdown(
-        f'<audio autoplay src="data:audio/mpeg;base64,{b64}"></audio>',
-        unsafe_allow_html=True,
-    )
+# ---------------------------------------------------------------------------
+# Public API — SFX
+# ---------------------------------------------------------------------------
 
 
 def play_sfx(name: str) -> None:
     """Queue a sound effect to be played on the next render cycle.
 
     Call this from action handlers (roll, bust, bank, etc.).
-    The actual audio injection happens in render_pending_sfx().
+    The actual playback happens in :func:`render_audio_system`.
     """
-    if not st.session_state.get("sfx_enabled", True):
+    if not st.session_state.get("_sfx_pref", True):
         return
     if name not in _SFX_FILES:
         return
     st.session_state["_sfx_pending"] = name
 
 
-def render_pending_sfx() -> None:
-    """Consume and play any pending sound effect.
+# ---------------------------------------------------------------------------
+# Public API — sidebar controls
+# ---------------------------------------------------------------------------
 
-    Call this once at the end of the page render (in app.py) so the
-    <audio> tag is emitted exactly once per event, not on every rerun.
+
+def _sync_sfx_pref() -> None:
+    st.session_state["_sfx_pref"] = st.session_state["_sfx_widget"]
+
+
+def _sync_music_pref() -> None:
+    st.session_state["_music_pref"] = st.session_state["_music_widget"]
+
+
+def render_sound_controls() -> None:
+    """Render SFX and music toggles in the sidebar.
+
+    Uses ``_sfx_pref`` / ``_music_pref`` (non-widget keys) for persistent
+    storage so preferences survive page transitions and reruns where the
+    sidebar widgets might not render (e.g. when ``st.rerun()`` fires
+    mid-page).
     """
-    pending = st.session_state.pop("_sfx_pending", None)
-    if pending and pending in _SFX_FILES:
-        _inject_sfx(_SFX_FILES[pending])
+    with st.sidebar:
+        st.session_state.setdefault("_sfx_pref", True)
+        st.session_state.setdefault("_music_pref", True)
+
+        st.toggle(
+            "Sound Effects",
+            value=st.session_state["_sfx_pref"],
+            key="_sfx_widget",
+            on_change=_sync_sfx_pref,
+        )
+        st.toggle(
+            "Music",
+            value=st.session_state["_music_pref"],
+            key="_music_widget",
+            on_change=_sync_music_pref,
+        )
 
 
-def render_background_music(page: str, game_mode: str | None = None) -> None:
-    """Render the background music player in the sidebar.
+# ---------------------------------------------------------------------------
+# Public API — audio system renderer
+# ---------------------------------------------------------------------------
 
-    Uses an HTML <audio> element with autoplay, loop, and controls so music
-    starts immediately and the user can pause/adjust volume via native controls.
-    Tracks the current track key in session state so the element is only
-    re-injected when the track actually changes (avoids restarting on reruns).
 
-    Args:
-        page: Current page name (home, lobby_waiting, game, results).
-        game_mode: Current game mode if in-game (peasants_gamble / alchemists_ascent).
+def render_audio_system(page: str, game_mode: str | None = None) -> None:
+    """Render the complete audio system (background music + pending SFX).
+
+    Uses a single ``components.html`` call with JavaScript that caches
+    ``Audio`` objects in ``window.parent._dd_audio``.  Base64 audio data is
+    included **only** the first time a track is needed; all subsequent
+    reruns send only lightweight play/pause commands.
     """
-    if not st.session_state.get("music_enabled", True):
-        st.session_state.pop("_current_music_track", None)
-        return
+    music_enabled = st.session_state.get("_music_pref", True)
+    sfx_enabled = st.session_state.get("_sfx_pref", True)
 
-    # Determine which track to play
+    # --- Determine current music track --------------------------------
     if page in ("home", "lobby_waiting", "results"):
         track_key = "menu"
     elif page == "game" and game_mode in _MUSIC_FILES:
@@ -106,36 +138,80 @@ def render_background_music(page: str, game_mode: str | None = None) -> None:
     else:
         track_key = "menu"
 
-    filename = _MUSIC_FILES[track_key]
-    b64 = _load_audio_b64(filename)
-    if b64 is None:
-        return
+    # --- Consume pending SFX ------------------------------------------
+    sfx_pending = st.session_state.pop("_sfx_pending", None)
+    if not sfx_enabled:
+        sfx_pending = None
 
-    with st.sidebar:
-        # Only re-inject when the track changes to avoid restarting mid-song
-        prev_track = st.session_state.get("_current_music_track")
-        if prev_track != track_key:
-            st.session_state["_current_music_track"] = track_key
+    # --- Build JS for one-time data preloads --------------------------
+    loaded: set[str] = st.session_state.get("_audio_loaded", set())
+    preload_parts: list[str] = []
 
-        st.markdown(
-            f'<audio id="bg-music" autoplay loop controls '
-            f'src="data:audio/mpeg;base64,{b64}" '
-            f'style="width:100%;margin-top:8px;"></audio>',
-            unsafe_allow_html=True,
+    # Music: load current track if not yet cached in the browser
+    if music_enabled and track_key not in loaded:
+        b64 = _load_audio_b64(_MUSIC_FILES[track_key])
+        if b64:
+            preload_parts.append(
+                f"dd.music['{track_key}'] = new Audio("
+                f"'data:audio/mpeg;base64,{b64}');\n"
+                f"dd.music['{track_key}'].loop = true;\n"
+                f"dd.music['{track_key}'].volume = 0.3;"
+            )
+            loaded.add(track_key)
+
+    # SFX: load on first trigger (lazy — ~50-300 KB each)
+    sfx_cache_key = f"sfx_{sfx_pending}" if sfx_pending else None
+    if sfx_pending and sfx_cache_key and sfx_cache_key not in loaded:
+        b64 = _load_audio_b64(_SFX_FILES[sfx_pending])
+        if b64:
+            preload_parts.append(
+                f"dd.sfx['{sfx_pending}'] = "
+                f"'data:audio/mpeg;base64,{b64}';"
+            )
+            loaded.add(sfx_cache_key)
+
+    st.session_state["_audio_loaded"] = loaded
+
+    # --- Build lightweight control JS ---------------------------------
+    control_parts: list[str] = []
+
+    if music_enabled:
+        control_parts.append(
+            f"Object.entries(dd.music).forEach(function(e) {{\n"
+            f"  if (e[0] !== '{track_key}') e[1].pause();\n"
+            f"}});\n"
+            f"var cur = dd.music['{track_key}'];\n"
+            f"if (cur && cur.paused) cur.play().catch(function(){{}});"
+        )
+    else:
+        control_parts.append(
+            "Object.values(dd.music).forEach(function(a){ a.pause(); });"
         )
 
-
-def render_sound_controls() -> None:
-    """Render SFX and music toggles in the sidebar."""
-    with st.sidebar:
-        st.session_state.setdefault("sfx_enabled", True)
-        st.session_state.setdefault("music_enabled", True)
-
-        st.toggle(
-            "Sound Effects",
-            key="sfx_enabled",
+    if sfx_pending:
+        control_parts.append(
+            f"if (dd.sfx['{sfx_pending}']) {{\n"
+            f"  var s = new Audio(dd.sfx['{sfx_pending}']);\n"
+            f"  s.play().catch(function(){{}});\n"
+            f"}}"
         )
-        st.toggle(
-            "Music",
-            key="music_enabled",
-        )
+
+    # --- Combine into a single components.html call -------------------
+    preload_js = "\n".join(preload_parts)
+    control_js = "\n".join(control_parts)
+
+    html = (
+        "<script>\n"
+        "(function() {\n"
+        "  try {\n"
+        "    var p = window.parent;\n"
+        "    if (!p._dd_audio) p._dd_audio = { music: {}, sfx: {} };\n"
+        "    var dd = p._dd_audio;\n"
+        + preload_js + "\n"
+        + control_js + "\n"
+        "  } catch(e) { console.warn('DD audio:', e); }\n"
+        "})();\n"
+        "</script>"
+    )
+
+    components.html(html, height=0)

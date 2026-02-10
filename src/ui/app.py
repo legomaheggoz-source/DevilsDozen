@@ -17,8 +17,7 @@ def main() -> None:
     # Load medieval theme CSS and sound system
     from src.ui.themes import (
         load_css,
-        render_background_music,
-        render_pending_sfx,
+        render_audio_system,
         render_sound_controls,
     )
     load_css()
@@ -45,11 +44,10 @@ def main() -> None:
         st.session_state["page"] = "home"
         st.rerun()
 
-    # Sound system (sidebar controls + pending SFX + background music)
+    # Sound system (sidebar controls + JS-cached audio)
     render_sound_controls()
-    render_pending_sfx()
     game_mode = st.session_state.get("game_mode")
-    render_background_music(page, game_mode)
+    render_audio_system(page, game_mode)
 
 
 if __name__ == "__main__":
