@@ -10,9 +10,14 @@ from src.ui.components.lobby import render_lobby
 def render_home_page() -> None:
     """Render the home / landing page."""
     st.title("Devil's Dozen")
-    st.caption("A medieval dice game of risk and reward")
+    st.caption("Medieval dice games of risk and reward")
 
-    # Game mode descriptions
+    # Lobby creation/joining
+    render_lobby()
+
+    st.divider()
+
+    # Game mode descriptions (below lobby)
     with st.expander("Peasant's Gamble (D6) — Rules"):
         st.markdown(
             """
@@ -79,6 +84,3 @@ you bust!
 **No busting, no banking — pure placement strategy!**
 """
         )
-
-    st.divider()
-    render_lobby()
