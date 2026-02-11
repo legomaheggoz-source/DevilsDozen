@@ -34,6 +34,9 @@ _SFX_FILES: dict[str, str] = {
     "tier_advance": "tier_advance.mp3",
     "die_destroy": "die_destroy.mp3",  # Knucklebones: die destroyed
     "place_die": "place_die.mp3",      # Knucklebones: die placed (no destruction)
+    "abduction": "abduction.mp3",      # Alien Invasion: earthling selected
+    "blaster": "blaster.mp3",          # Alien Invasion: death ray selected
+    "tank_roll": "tank_roll.mp3",      # Alien Invasion: tanks rolled
 }
 
 _MUSIC_FILES: dict[str, str] = {
@@ -41,6 +44,7 @@ _MUSIC_FILES: dict[str, str] = {
     "peasants_gamble": "d6_theme.mp3",
     "alchemists_ascent": "d20_theme.mp3",
     "knucklebones": "knucklebones_theme.mp3",
+    "alien_invasion": "alien_invasion_theme.mp3",
 }
 
 # ---------------------------------------------------------------------------

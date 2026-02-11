@@ -88,6 +88,11 @@ class GameStateManager:
                 "is_bust": False,
                 "roll_count": 0,
                 "previous_dice": [],
+                # Reset Alien Invasion fields
+                "tanks_count": 0,
+                "death_rays_count": 0,
+                "earthlings_count": 0,
+                "selected_earthling_types": [],
             })
             .eq("lobby_id", lobby_id)
             .execute()
@@ -149,6 +154,47 @@ class GameStateManager:
                 "player2_grid": {"columns": [[], [], []]},
                 "current_die_value": None,
             })
+            .eq("lobby_id", lobby_id)
+            .execute()
+        )
+        return GameState.model_validate(data.data[0])
+
+    def update_alien_invasion(
+        self,
+        lobby_id: str,
+        **kwargs,
+    ) -> GameState:
+        """
+        Update Alien Invasion-specific game state fields.
+
+        Args:
+            lobby_id: The lobby to update
+            tanks_count: Number of tanks collected
+            death_rays_count: Number of death rays collected
+            earthlings_count: Number of earthlings collected
+            selected_earthling_types: List of earthling type names selected
+
+        Returns:
+            Updated GameState
+        """
+        updates: dict = {}
+
+        # Use kwargs to distinguish "not provided" from "provided as None"
+        if "tanks_count" in kwargs:
+            updates["tanks_count"] = kwargs["tanks_count"]
+        if "death_rays_count" in kwargs:
+            updates["death_rays_count"] = kwargs["death_rays_count"]
+        if "earthlings_count" in kwargs:
+            updates["earthlings_count"] = kwargs["earthlings_count"]
+        if "selected_earthling_types" in kwargs:
+            updates["selected_earthling_types"] = kwargs["selected_earthling_types"]
+
+        if not updates:
+            return self.get(lobby_id)  # type: ignore[return-value]
+
+        data = (
+            self.table
+            .update(updates)
             .eq("lobby_id", lobby_id)
             .execute()
         )

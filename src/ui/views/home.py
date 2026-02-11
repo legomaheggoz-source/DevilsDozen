@@ -84,3 +84,41 @@ you bust!
 **No busting, no banking — pure placement strategy!**
 """
         )
+
+    with st.expander("Alien Invasion (Martian Dice) — Rules"):
+        st.markdown(
+            """
+**Abduct Earthlings while surviving the Tank onslaught!**
+
+**Setup:**
+- Roll 13 D6 dice each turn
+- Race to be the first to reach 25, 50, or 75 points
+
+**Dice Faces:**
+- 👤 **Human**, 🐄 **Cow**, 🐔 **Chicken** (Earthlings)
+- ⚡ **Death Ray** (Defense against Tanks)
+- 🔺 **Tank** (Auto-locks - the threat!)
+
+**Rolling:**
+- Roll all 13 dice on your first roll
+- Tanks (🔺) automatically lock and cannot be un-selected
+- On each subsequent roll, roll only the dice you haven't selected yet
+
+**Selecting:**
+- After rolling, select a **group** of dice:
+  - **Earthlings**: Pick ONE type (Human, Cow, OR Chicken) per turn
+  - **Death Rays**: Can be selected multiple times to build defense
+
+**Scoring:**
+- **1 point** per Earthling (Human/Cow/Chicken)
+- **+3 bonus** if you collect all three Earthling types in one turn
+- **BUST if Tanks > Death Rays** when you bank = 0 points!
+
+**Strategy:**
+- Balance collecting Earthlings with getting enough Death Rays
+- The Tug of War meter shows if you're safe or in the BUST ZONE
+- Bank early if Tanks are piling up, or risk another roll!
+
+**No hot dice, no second chances — survive and abduct!**
+"""
+        )

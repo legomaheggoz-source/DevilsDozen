@@ -39,11 +39,12 @@ def _render_create_form() -> None:
     # Game mode outside the form so target score updates immediately
     game_mode = st.selectbox(
         "Game Mode",
-        options=["peasants_gamble", "alchemists_ascent", "knucklebones"],
+        options=["peasants_gamble", "alchemists_ascent", "knucklebones", "alien_invasion"],
         format_func=lambda m: (
             "Peasant's Gamble (D6)" if m == "peasants_gamble"
             else "Alchemist's Ascent (D20)" if m == "alchemists_ascent"
-            else "Knucklebones (Grid Battle)"
+            else "Knucklebones (Grid Battle)" if m == "knucklebones"
+            else "Alien Invasion (Martian Dice)"
         ),
         key="create_game_mode",
     )
@@ -58,10 +59,18 @@ def _render_create_form() -> None:
     elif game_mode == "alchemists_ascent":
         target = 250
         st.markdown("**Target Score:** 250 (fixed)")
-    else:  # knucklebones
+    elif game_mode == "knucklebones":
         target = 999  # Placeholder (not used; game ends on full grid)
         st.markdown("**Mode:** 2 players only")
         st.caption("⚔️ Strategic dice placement with grid destruction")
+    else:  # alien_invasion
+        target = st.selectbox(
+            "Target Score",
+            options=[25, 50, 75],
+            index=1,
+            key="create_target_score",
+        )
+        st.caption("Abduct Earthlings, avoid Tanks!")
 
     with st.form("create_lobby_form"):
         username = st.text_input(

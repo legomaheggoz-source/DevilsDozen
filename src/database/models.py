@@ -55,6 +55,11 @@ class GameState(BaseModel):
     player1_grid: dict = Field(default_factory=lambda: {"columns": [[], [], []]})
     player2_grid: dict = Field(default_factory=lambda: {"columns": [[], [], []]})
     current_die_value: int | None = None
+    # Alien Invasion fields
+    tanks_count: int = 0
+    death_rays_count: int = 0
+    earthlings_count: int = 0
+    selected_earthling_types: list[str] = Field(default_factory=list)
     updated_at: datetime
 
     model_config = {"from_attributes": True}

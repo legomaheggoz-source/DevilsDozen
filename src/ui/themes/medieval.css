@@ -591,3 +591,230 @@ hr {
         padding: 4px;
     }
 }
+
+/* === Alien Invasion - Tug of War Meter === */
+
+.tug-of-war-container {
+    padding: 20px;
+    margin: 16px 0;
+    background: linear-gradient(180deg, var(--bg-medium), var(--bg-dark));
+    border: 2px solid var(--gold-dark);
+    border-radius: 12px;
+}
+
+.tug-of-war-header {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.tow-status {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.tug-of-war-meter {
+    position: relative;
+    height: 40px;
+    margin: 20px 0;
+}
+
+.tug-of-war-bar {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        #ff2e2e 0%,
+        #ff6e2e 20%,
+        #ffae2e 40%,
+        #c9a84c 50%,
+        #8ec959 60%,
+        #4ecca3 80%,
+        #2d8f72 100%
+    );
+    border-radius: 20px;
+    border: 2px solid var(--gold-dark);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tug-of-war-indicator {
+    position: absolute;
+    top: -4px;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 48px;
+    background: var(--text-primary);
+    border: 2px solid var(--gold);
+    border-radius: 3px;
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.6);
+    transition: left 0.3s ease;
+}
+
+.tug-of-war-counts {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    font-family: var(--font-body);
+    font-size: 16px;
+}
+
+.tow-count {
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+.tow-tanks {
+    color: var(--red);
+    background: rgba(233, 69, 96, 0.15);
+}
+
+.tow-rays {
+    color: var(--green);
+    background: rgba(78, 204, 163, 0.15);
+}
+
+/* Responsive - Tug of War */
+@media (max-width: 768px) {
+    .tug-of-war-container {
+        padding: 15px;
+    }
+
+    .tow-status {
+        font-size: 16px;
+    }
+
+    .tug-of-war-meter {
+        height: 32px;
+    }
+
+    .tug-of-war-indicator {
+        height: 40px;
+    }
+
+    .tow-count {
+        font-size: 14px;
+    }
+}
+
+/* === Alien Invasion - Dice with Colored Borders === */
+
+.die.alien-invasion {
+    position: relative;
+}
+
+/* Face types - colored borders (use background-color, not shorthand,
+   so CSS background-image injected by dice_tray_alien.py is preserved) */
+.die.alien-invasion.face-human {
+    border: 3px solid #4a90e2;
+    background-color: rgba(74, 144, 226, 0.1);
+}
+
+.die.alien-invasion.face-cow {
+    border: 3px solid #8e44ad;
+    background-color: rgba(142, 68, 173, 0.1);
+}
+
+.die.alien-invasion.face-chicken {
+    border: 3px solid #f39c12;
+    background-color: rgba(243, 156, 18, 0.1);
+}
+
+.die.alien-invasion.face-death-ray {
+    border: 3px solid var(--green);
+    background-color: rgba(78, 204, 163, 0.1);
+}
+
+.die.alien-invasion.face-tank {
+    border: 3px solid var(--red);
+    background-color: rgba(233, 69, 96, 0.1);
+}
+
+/* Auto-locked tank indicator */
+.die.alien-invasion.auto-locked {
+    border: 3px solid #ff0000;
+    box-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
+    opacity: 0.85;
+}
+
+/* Held dice indicator (Death Rays or Earthlings) */
+.die.alien-invasion.held {
+    box-shadow: 0 0 12px rgba(78, 204, 163, 0.5);
+    transform: translateY(-4px);
+}
+
+/* === Alien Invasion - Set-Aside Dice Display === */
+
+.set-aside-container {
+    padding: 16px;
+    margin: 12px 0;
+    background: linear-gradient(180deg, var(--bg-medium), var(--bg-dark));
+    border: 2px solid var(--gold-dark);
+    border-radius: 12px;
+}
+
+.set-aside-status {
+    text-align: center;
+    margin-bottom: 12px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.set-aside-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.set-aside-label {
+    min-width: 130px;
+    font-family: var(--font-body);
+    font-weight: bold;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+
+.set-aside-dice {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.set-aside-empty {
+    color: var(--text-secondary);
+    opacity: 0.4;
+    font-size: 14px;
+}
+
+.die.alien-invasion.set-aside {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border-width: 2px;
+    border-radius: 8px;
+}
+
+/* Responsive - Alien Invasion Dice */
+@media (max-width: 768px) {
+    .die.alien-invasion {
+        width: 56px;
+        height: 56px;
+    }
+
+    .die.alien-invasion.set-aside {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+
+    .set-aside-label {
+        min-width: 100px;
+        font-size: 13px;
+    }
+}

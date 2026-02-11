@@ -15,10 +15,20 @@ from src.engine.peasants_gamble import PeasantsGambleEngine
 from src.engine.alchemists_ascent import AlchemistsAscentEngine
 from src.engine.base import Tier
 from src.engine.knucklebones import KnuckleboneEngine, GridState
+from src.engine.alien_invasion import (
+    AlienInvasionEngine,
+    AlienInvasionTurnState,
+    FaceType,
+)
 from src.ui.components.dice_tray import render_dice_tray
 from src.ui.components.scoreboard import render_scoreboard
 from src.ui.components.turn_controls import render_turn_controls
 from src.ui.components.knucklebones_board import render_knucklebones_board
+from src.ui.components.dice_tray_alien import (
+    render_alien_dice_tray,
+    render_group_selection_buttons,
+    render_set_aside_dice,
+)
 from src.ui.themes.animations import (
     render_bust_animation,
     render_hot_dice_animation,
@@ -94,6 +104,11 @@ def render_game_page() -> None:
     # Route to Knucklebones if that's the game mode
     if game_mode == "knucklebones":
         _render_knucklebones_game(lobby, players, game_state, player_id)
+        return
+
+    # Route to Alien Invasion if that's the game mode
+    if game_mode == "alien_invasion":
+        _render_alien_invasion_game(lobby, players, game_state, player_id)
         return
 
     is_d20 = game_mode == "alchemists_ascent"
@@ -927,3 +942,360 @@ def _handle_knucklebones_placement(column_idx, game_state, lobby, players, my_tu
     except ValueError as e:
         st.error(f"Cannot place die: {e}")
         return
+
+
+# === Alien Invasion Game Mode ===
+
+
+def _render_alien_invasion_game(lobby, players, game_state, player_id):
+    """Render the Alien Invasion (Martian Dice) game mode."""
+    ss = st.session_state
+    lobby_id = str(lobby.id)
+
+    lobby_mgr, player_mgr, gs_mgr = _managers()
+
+    current_turn_index = lobby.current_turn_index
+    active_player = players[current_turn_index] if current_turn_index < len(players) else players[0]
+    is_my_turn = str(active_player.id) == player_id
+
+    # Build Alien Invasion turn state from DB state
+    turn_state = AlienInvasionTurnState(
+        active_dice=tuple(game_state.active_dice),
+        held_indices=frozenset(game_state.held_indices),
+        tanks_count=game_state.tanks_count,
+        death_rays_count=game_state.death_rays_count,
+        earthlings_count=game_state.earthlings_count,
+        selected_types=tuple(game_state.selected_earthling_types),
+        turn_score=game_state.turn_score,
+        roll_count=game_state.roll_count,
+    )
+
+    # --- "Must select before rerolling" flag ---
+    # Reset when turn changes (roll_count == 0)
+    if turn_state.roll_count == 0:
+        ss["_alien_needs_selection"] = False
+    needs_selection = ss.get("_alien_needs_selection", False)
+
+    # --- Immediate bust detection ---
+    # A true immediate bust means: even if you set aside every visible
+    # death ray right now AND rolled all remaining dice as death rays on
+    # future rolls, you still can't reach enough to match the tanks.
+    #
+    # After taking visible death rays, the unheld non-ray dice become
+    # the pool for the next roll — every one of those *could* be a
+    # death ray.  So max theoretical rays = set-aside + visible + remaining.
+    is_immediate_bust = False
+    if turn_state.roll_count > 0 and turn_state.active_dice:
+        visible_death_rays = sum(
+            1 for i, v in enumerate(turn_state.active_dice)
+            if i not in turn_state.held_indices and v in (4, 5)
+        )
+        # Unheld dice that are NOT death rays = future reroll pool
+        remaining_after_select = sum(
+            1 for i, v in enumerate(turn_state.active_dice)
+            if i not in turn_state.held_indices and v not in (4, 5)
+        )
+        max_possible_rays = (
+            turn_state.death_rays_count + visible_death_rays + remaining_after_select
+        )
+        is_immediate_bust = turn_state.tanks_count > max_possible_rays
+
+    # --- Layout: game area (3) | scoreboard (1) ---
+    game_col, score_col = st.columns([3, 1])
+
+    with score_col:
+        st.caption(f"Lobby: **{lobby.code}**")
+
+        render_scoreboard(
+            players=players,
+            current_turn_index=current_turn_index,
+            turn_score=game_state.turn_score,
+            target_score=lobby.win_condition,
+            my_player_id=player_id,
+            game_mode="alien_invasion",
+        )
+
+    with game_col:
+        st.subheader(f"{active_player.username}'s Turn")
+
+        # Render dice tray (active dice with held styling)
+        auto_locked_indices = set()
+        if turn_state.active_dice:
+            classification = AlienInvasionEngine.classify_dice(turn_state.active_dice)
+            auto_locked_indices = set(classification[FaceType.TANK])
+
+        render_alien_dice_tray(
+            dice=game_state.active_dice,
+            held_indices=set(game_state.held_indices),
+            auto_locked_indices=auto_locked_indices,
+            is_my_turn=is_my_turn,
+            roll_count=game_state.roll_count,
+        )
+
+        # --- Immediate bust: show bust message + forced end turn ---
+        if is_immediate_bust:
+            st.error(
+                f"💀 IMMEDIATE BUST! Tanks ({turn_state.tanks_count}) outnumber "
+                f"the maximum possible Death Rays ({max_possible_rays}) even if "
+                f"every remaining die were a Death Ray. No recovery possible!"
+            )
+            if is_my_turn:
+                if st.button(
+                    "End Turn (0 pts)",
+                    key="btn_immediate_bust",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players)
+        else:
+            # Show group selection buttons if roll count > 0
+            if is_my_turn and turn_state.roll_count > 0 and not game_state.is_bust:
+                available = AlienInvasionEngine.get_available_selections(turn_state)
+
+                # Check if stuck (no selections and no earthlings)
+                if AlienInvasionEngine.is_stuck(turn_state):
+                    st.error("⚠️ All remaining dice are Tanks! You're stuck - must end turn (BUST).")
+                    if st.button("End Turn (Bust)", key="btn_stuck_end", type="primary", use_container_width=True):
+                        _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players)
+                else:
+                    # Show "must select" warning if needed
+                    if needs_selection and available:
+                        st.warning("⚠️ You must select at least one group before rolling again!")
+
+                    # Show selection buttons
+                    selected_type = render_group_selection_buttons(
+                        available_selections=available,
+                        is_my_turn=is_my_turn,
+                        roll_count=turn_state.roll_count,
+                    )
+
+                    if selected_type:
+                        _handle_alien_invasion_selection(
+                            turn_state,
+                            selected_type,
+                            available[selected_type],
+                            gs_mgr,
+                            lobby_id,
+                        )
+
+        # Set-aside dice display (replaces old progress expander)
+        if turn_state.roll_count > 0:
+            scoring_result = AlienInvasionEngine.calculate_final_score(turn_state)
+            render_set_aside_dice(
+                selected_earthling_types=list(turn_state.selected_types),
+                death_rays_count=turn_state.death_rays_count,
+                tanks_count=turn_state.tanks_count,
+                scoring_result=scoring_result,
+            )
+
+        # Turn controls (skip if immediate bust — already handled above)
+        if not is_immediate_bust and is_my_turn and not game_state.is_bust:
+            st.markdown("---")
+
+            # Determine what actions are available
+            needs_selection = ss.get("_alien_needs_selection", False)
+            can_roll = turn_state.roll_count == 0 or (
+                not needs_selection and turn_state.available_dice_count > 0
+            )
+            scoring_result = AlienInvasionEngine.calculate_final_score(turn_state)
+            can_bank = turn_state.earthlings_count > 0 and scoring_result.is_safe_to_bank
+            available = AlienInvasionEngine.get_available_selections(turn_state) if turn_state.roll_count > 0 else {}
+            has_selections = len(available) > 0
+
+            if turn_state.roll_count > 0 and not can_roll and not can_bank and not has_selections:
+                # Player has no actions left — forced end of turn
+                if scoring_result.is_bust:
+                    st.error(
+                        f"Turn over! Tanks ({turn_state.tanks_count}) > "
+                        f"Death Rays ({turn_state.death_rays_count}) — BUST!"
+                    )
+                else:
+                    st.warning("No more actions available.")
+                if st.button(
+                    "End Turn (0 pts)",
+                    key="btn_forced_end",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players)
+            else:
+                # Show Roll / Bank / End Turn buttons
+                show_end_turn = (
+                    turn_state.roll_count > 0
+                    and not can_bank
+                    and scoring_result.is_bust
+                )
+                btn_cols = st.columns(3 if show_end_turn else 2)
+
+                with btn_cols[0]:
+                    roll_label = "Roll Dice" if turn_state.roll_count == 0 else "Roll Again"
+                    if st.button(roll_label, key="btn_roll", disabled=not can_roll, use_container_width=True):
+                        _handle_alien_invasion_roll(turn_state, gs_mgr, lobby_id)
+
+                with btn_cols[1]:
+                    if st.button("Bank Earthlings", key="btn_bank", type="primary", disabled=not can_bank, use_container_width=True):
+                        _handle_alien_invasion_bank(
+                            turn_state,
+                            scoring_result,
+                            gs_mgr,
+                            lobby_mgr,
+                            player_mgr,
+                            lobby,
+                            players,
+                            player_id,
+                        )
+
+                if show_end_turn:
+                    with btn_cols[2]:
+                        if st.button("End Turn (0 pts)", key="btn_end_turn", use_container_width=True):
+                            _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players)
+
+        elif not is_immediate_bust and not is_my_turn:
+            st.info("Waiting for opponent's turn...")
+
+    # Polling fragment for multiplayer sync
+    _poll_game_state()
+
+
+def _handle_alien_invasion_roll(turn_state, gs_mgr, lobby_id):
+    """Handle rolling dice in Alien Invasion mode."""
+    # Process roll (auto-locks tanks)
+    new_state = AlienInvasionEngine.process_roll(turn_state)
+
+    # Update database
+    _db_retry(
+        gs_mgr.update,
+        lobby_id,
+        active_dice=list(new_state.active_dice),
+        held_indices=list(new_state.held_indices),
+        roll_count=new_state.roll_count,
+    )
+
+    # Update alien-specific fields
+    _db_retry(
+        gs_mgr.update_alien_invasion,
+        lobby_id,
+        tanks_count=new_state.tanks_count,
+    )
+
+    # Mark that player must select a group before rolling again
+    st.session_state["_alien_needs_selection"] = True
+
+    # Play sound effect
+    if new_state.tanks_count > turn_state.tanks_count:
+        play_sfx("tank_roll")  # Tanks rolled
+    else:
+        play_sfx("dice_roll")  # Normal roll
+
+    st.rerun()
+
+
+def _handle_alien_invasion_selection(turn_state, face_type, indices, gs_mgr, lobby_id):
+    """Handle group selection in Alien Invasion mode."""
+    try:
+        # Process selection
+        new_state = AlienInvasionEngine.process_selection(turn_state, face_type, indices)
+
+        # Update database
+        _db_retry(
+            gs_mgr.update,
+            lobby_id,
+            held_indices=list(new_state.held_indices),
+            turn_score=new_state.turn_score,
+        )
+
+        # Update alien-specific fields
+        _db_retry(
+            gs_mgr.update_alien_invasion,
+            lobby_id,
+            death_rays_count=new_state.death_rays_count,
+            earthlings_count=new_state.earthlings_count,
+            selected_earthling_types=list(new_state.selected_types),
+        )
+
+        # Clear the "must select" flag — player has now selected a group
+        st.session_state["_alien_needs_selection"] = False
+
+        # Play sound effect based on type
+        if face_type == FaceType.DEATH_RAY:
+            play_sfx("blaster")
+        else:
+            play_sfx("abduction")
+
+        st.rerun()
+
+    except ValueError as e:
+        st.error(f"Cannot select: {e}")
+
+
+def _handle_alien_invasion_bank(
+    turn_state,
+    scoring_result,
+    gs_mgr,
+    lobby_mgr,
+    player_mgr,
+    lobby,
+    players,
+    player_id,
+):
+    """Handle banking Earthlings in Alien Invasion mode."""
+    lobby_id = str(lobby.id)
+
+    if not scoring_result.is_safe_to_bank:
+        st.error("Cannot bank: Too many Tanks! You would BUST.")
+        return
+
+    if scoring_result.total_points == 0:
+        st.error("Cannot bank: No points to bank.")
+        return
+
+    # Update player score
+    active_player = players[lobby.current_turn_index]
+    new_score = active_player.total_score + scoring_result.total_points
+
+    _db_retry(
+        player_mgr.update_score,
+        str(active_player.id),
+        new_score,
+    )
+
+    # Check for win
+    if new_score >= lobby.win_condition:
+        _db_retry(lobby_mgr.set_winner, lobby_id, str(active_player.id))
+        _db_retry(lobby_mgr.update_status, lobby_id, "finished")
+        play_sfx("victory")
+        st.session_state["page"] = "results"
+        st.rerun()
+        return
+
+    # Advance turn
+    new_turn_index = (lobby.current_turn_index + 1) % len(players)
+    _db_retry(lobby_mgr.advance_turn, lobby_id, new_turn_index)
+
+    # Reset turn state
+    _db_retry(gs_mgr.reset_turn, lobby_id)
+
+    # Play bank sound
+    play_sfx("bank")
+
+    # Show score popup
+    render_score_popup(scoring_result.total_points)
+
+    st.rerun()
+
+
+def _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players):
+    """Handle ending turn with a bust in Alien Invasion mode."""
+    lobby_id = str(lobby.id)
+
+    # Advance turn
+    new_turn_index = (lobby.current_turn_index + 1) % len(players)
+    _db_retry(lobby_mgr.advance_turn, lobby_id, new_turn_index)
+
+    # Reset turn state
+    _db_retry(gs_mgr.reset_turn, lobby_id)
+
+    # Play bust sound
+    play_sfx("bust")
+
+    st.rerun()

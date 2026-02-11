@@ -22,6 +22,7 @@ class GameMode(Enum):
     PEASANTS_GAMBLE = "peasants_gamble"
     ALCHEMISTS_ASCENT = "alchemists_ascent"
     KNUCKLEBONES = "knucklebones"
+    ALIEN_INVASION = "alien_invasion"
 
 
 class Tier(Enum):
@@ -210,3 +211,9 @@ class GameConfig:
         elif self.mode == GameMode.KNUCKLEBONES:
             # Target score is not used in Knucklebones (game ends on full grid)
             pass
+        elif self.mode == GameMode.ALIEN_INVASION:
+            valid_targets = {25, 50, 75}
+            if self.target_score not in valid_targets:
+                raise ValueError(
+                    f"Target score for Alien Invasion must be one of {valid_targets}."
+                )

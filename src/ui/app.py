@@ -71,6 +71,35 @@ _KNUCKLEBONES_RULES = """\
 **Grid Lock:** Game ends when either grid is full!
 """
 
+_ALIEN_INVASION_RULES = """\
+**Goal:** First to the target score wins!
+
+**Dice Faces:**
+- 👤 Human, 🐄 Cow, 🐔 Chicken (Earthlings)
+- ⚡ Death Ray (Defense)
+- 🔺 Tank (Auto-locks!)
+
+**Rolling:**
+- Roll 13 D6 on first turn
+- Tanks (🔺) **auto-lock** and cannot be unselected
+- Roll remaining dice on subsequent rolls
+
+**Selecting:**
+- Pick **ONE Earthling type** (Human, Cow, OR Chicken) per turn
+- Pick **Death Rays** as many times as needed
+- Tanks cannot be manually selected
+
+**Scoring:**
+- 1 point per Earthling
+- +3 bonus for all 3 Earthling types
+- **BUST if Tanks > Death Rays** = 0 points!
+
+**Strategy:**
+- Balance Earthlings with Death Rays
+- Watch the Tug of War meter
+- Bank early if too many Tanks!
+"""
+
 
 def _render_sidebar_rules(game_mode: str) -> None:
     """Show rules for the current game mode in the sidebar."""
@@ -85,6 +114,9 @@ def _render_sidebar_rules(game_mode: str) -> None:
         elif game_mode == "knucklebones":
             st.markdown("### Knucklebones Rules")
             st.markdown(_KNUCKLEBONES_RULES)
+        elif game_mode == "alien_invasion":
+            st.markdown("### Alien Invasion Rules")
+            st.markdown(_ALIEN_INVASION_RULES)
 
 
 def main() -> None:
