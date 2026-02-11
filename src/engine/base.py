@@ -23,6 +23,7 @@ class GameMode(Enum):
     ALCHEMISTS_ASCENT = "alchemists_ascent"
     KNUCKLEBONES = "knucklebones"
     ALIEN_INVASION = "alien_invasion"
+    PIG = "pig"
 
 
 class Tier(Enum):
@@ -194,6 +195,10 @@ class GameConfig:
             # Knucklebones is strictly 2-player
             if self.num_players != 2:
                 raise ValueError("Knucklebones requires exactly 2 players.")
+        elif self.mode == GameMode.PIG:
+            # Pig supports 2-10 players
+            if not 2 <= self.num_players <= 10:
+                raise ValueError("Number of players for Pig must be between 2 and 10.")
         else:
             # Other modes support 2-4 players
             if not 2 <= self.num_players <= 4:
@@ -216,4 +221,10 @@ class GameConfig:
             if self.target_score not in valid_targets:
                 raise ValueError(
                     f"Target score for Alien Invasion must be one of {valid_targets}."
+                )
+        elif self.mode == GameMode.PIG:
+            valid_targets = {50, 100, 250}
+            if self.target_score not in valid_targets:
+                raise ValueError(
+                    f"Target score for Pig must be one of {valid_targets}."
                 )

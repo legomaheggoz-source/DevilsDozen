@@ -71,6 +71,20 @@ _KNUCKLEBONES_RULES = """\
 **Grid Lock:** Game ends when either grid is full!
 """
 
+_PIG_RULES = """\
+**Goal:** Be the first to reach the target score.
+
+**Rolling:**
+- Roll the die as many times as you dare
+- Rolling **2-6** adds that amount to your turn total
+- Rolling **1** is a **BUST** — lose all points from this turn!
+
+**Banking:**
+- Stop at any time to lock in your points
+
+*Strategy: Don't be a pig! One bad roll takes it all.*
+"""
+
 _ALIEN_INVASION_RULES = """\
 **Goal:** First to the target score wins!
 
@@ -117,6 +131,9 @@ def _render_sidebar_rules(game_mode: str) -> None:
         elif game_mode == "alien_invasion":
             st.markdown("### Alien Invasion Rules")
             st.markdown(_ALIEN_INVASION_RULES)
+        elif game_mode == "pig":
+            st.markdown("### Pig Rules")
+            st.markdown(_PIG_RULES)
 
 
 def main() -> None:

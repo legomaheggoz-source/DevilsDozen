@@ -15,6 +15,7 @@ from src.engine.base import (
 )
 from src.engine.peasants_gamble import PeasantsGambleEngine
 from src.engine.alchemists_ascent import AlchemistsAscentEngine
+from src.engine.pig import PigEngine
 
 __all__ = [
     # Data Classes
@@ -28,4 +29,5 @@ __all__ = [
     # Engines
     "PeasantsGambleEngine",
     "AlchemistsAscentEngine",
+    "PigEngine",
 ]

@@ -20,6 +20,7 @@ from src.engine.alien_invasion import (
     AlienInvasionTurnState,
     FaceType,
 )
+from src.engine.pig import PigEngine
 from src.ui.components.dice_tray import render_dice_tray
 from src.ui.components.scoreboard import render_scoreboard
 from src.ui.components.turn_controls import render_turn_controls
@@ -109,6 +110,11 @@ def render_game_page() -> None:
     # Route to Alien Invasion if that's the game mode
     if game_mode == "alien_invasion":
         _render_alien_invasion_game(lobby, players, game_state, player_id)
+        return
+
+    # Route to Pig if that's the game mode
+    if game_mode == "pig":
+        _render_pig_game(lobby, players, game_state, player_id)
         return
 
     is_d20 = game_mode == "alchemists_ascent"
@@ -1299,3 +1305,159 @@ def _handle_alien_invasion_end_turn_bust(gs_mgr, lobby_mgr, lobby, players):
     play_sfx("bust")
 
     st.rerun()
+
+
+# === Pig Game Mode ===
+
+
+def _render_pig_game(lobby, players, game_state, player_id):
+    """Render the Pig (single-die push-your-luck) game mode."""
+    ss = st.session_state
+    lobby_id = str(lobby.id)
+
+    lobby_mgr, player_mgr, gs_mgr = _managers()
+
+    current_turn_index = lobby.current_turn_index
+    active_player = players[current_turn_index] if current_turn_index < len(players) else players[0]
+    is_my_turn = str(active_player.id) == player_id
+
+    # --- Layout: game area (3) | scoreboard (1) ---
+    game_col, score_col = st.columns([3, 1])
+
+    with score_col:
+        st.caption(f"Lobby: **{lobby.code}**")
+
+        render_scoreboard(
+            players=players,
+            current_turn_index=current_turn_index,
+            turn_score=game_state.turn_score,
+            target_score=lobby.win_condition,
+            my_player_id=player_id,
+            game_mode="pig",
+        )
+
+    with game_col:
+        st.subheader(f"{active_player.username}'s Turn")
+
+        # Show die if rolled
+        if game_state.roll_count > 0 and game_state.active_dice:
+            die_value = game_state.active_dice[0]
+
+            if game_state.is_bust:
+                render_bust_animation()
+                # Show the bust die
+                st.markdown(
+                    f'<div class="dice-tray" style="min-height: auto; padding: 12px;">'
+                    f'<div class="die bust">{die_value}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                # Show the scored die
+                st.markdown(
+                    f'<div class="dice-tray" style="min-height: auto; padding: 12px;">'
+                    f'<div class="die scoring">{die_value}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Pending score display
+        if game_state.turn_score > 0 and not game_state.is_bust:
+            st.markdown(
+                f'<div class="pig-pending-score">+{game_state.turn_score} pts</div>',
+                unsafe_allow_html=True,
+            )
+
+        # Action buttons
+        roll_clicked = False
+        bank_clicked = False
+        end_turn_clicked = False
+
+        if is_my_turn:
+            if game_state.is_bust:
+                # Bust — show end turn button
+                if st.button(
+                    "End Turn (0 pts)",
+                    key=f"btn_pig_end_r{game_state.roll_count}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    end_turn_clicked = True
+            else:
+                # Roll / Bank buttons
+                btn_cols = st.columns(2)
+                with btn_cols[0]:
+                    roll_label = "Roll" if game_state.roll_count == 0 else "Roll Again"
+                    if st.button(
+                        roll_label,
+                        key=f"btn_pig_roll_r{game_state.roll_count}",
+                        use_container_width=True,
+                    ):
+                        roll_clicked = True
+
+                with btn_cols[1]:
+                    can_bank = game_state.roll_count > 0 and game_state.turn_score > 0
+                    if st.button(
+                        f"Bank {game_state.turn_score} pts",
+                        key=f"btn_pig_bank_r{game_state.roll_count}",
+                        type="primary",
+                        disabled=not can_bank,
+                        use_container_width=True,
+                    ):
+                        bank_clicked = True
+        else:
+            st.info("Waiting for opponent's turn...")
+
+        # Handle actions after render (no st.rerun in callbacks)
+        if roll_clicked:
+            _handle_pig_roll(game_state, gs_mgr, lobby_id)
+        elif bank_clicked:
+            _handle_pig_bank(game_state, gs_mgr, lobby_mgr, player_mgr, lobby, players, player_id)
+        elif end_turn_clicked:
+            _advance_turn(gs_mgr, lobby_mgr, lobby, players)
+
+    # Polling fragment for multiplayer sync
+    _poll_game_state()
+
+
+def _handle_pig_roll(game_state, gs_mgr, lobby_id):
+    """Roll a single die for Pig mode."""
+    new_score, roll, is_bust = PigEngine.process_roll(game_state.turn_score)
+
+    _db_retry(
+        gs_mgr.update,
+        lobby_id,
+        active_dice=list(roll.values),
+        held_indices=[],
+        turn_score=new_score,
+        is_bust=is_bust,
+        roll_count=game_state.roll_count + 1,
+    )
+
+    if is_bust:
+        play_sfx("pig_squeal")
+    else:
+        play_sfx("dice_roll")
+
+    st.rerun()
+
+
+def _handle_pig_bank(game_state, gs_mgr, lobby_mgr, player_mgr, lobby, players, player_id):
+    """Bank turn score in Pig mode."""
+    lobby_id = str(lobby.id)
+    current_turn_index = lobby.current_turn_index
+    active_player = players[current_turn_index]
+
+    new_total = active_player.total_score + game_state.turn_score
+    _db_retry(player_mgr.update_score, str(active_player.id), new_total)
+    play_sfx("bank")
+
+    # Check win
+    if new_total >= lobby.win_condition:
+        _db_retry(lobby_mgr.set_winner, lobby_id, str(active_player.id))
+        st.session_state["page"] = "results"
+        st.rerun()
+        return
+
+    # Advance turn
+    _advance_turn(gs_mgr, lobby_mgr, lobby, players)

@@ -39,12 +39,13 @@ def _render_create_form() -> None:
     # Game mode outside the form so target score updates immediately
     game_mode = st.selectbox(
         "Game Mode",
-        options=["peasants_gamble", "alchemists_ascent", "knucklebones", "alien_invasion"],
+        options=["peasants_gamble", "alchemists_ascent", "knucklebones", "alien_invasion", "pig"],
         format_func=lambda m: (
             "Peasant's Gamble (D6)" if m == "peasants_gamble"
             else "Alchemist's Ascent (D20)" if m == "alchemists_ascent"
             else "Knucklebones (Grid Battle)" if m == "knucklebones"
-            else "Alien Invasion (Martian Dice)"
+            else "Alien Invasion (Martian Dice)" if m == "alien_invasion"
+            else "Pig"
         ),
         key="create_game_mode",
     )
@@ -63,7 +64,7 @@ def _render_create_form() -> None:
         target = 999  # Placeholder (not used; game ends on full grid)
         st.markdown("**Mode:** 2 players only")
         st.caption("⚔️ Strategic dice placement with grid destruction")
-    else:  # alien_invasion
+    elif game_mode == "alien_invasion":
         target = st.selectbox(
             "Target Score",
             options=[25, 50, 75],
@@ -71,6 +72,14 @@ def _render_create_form() -> None:
             key="create_target_score",
         )
         st.caption("Abduct Earthlings, avoid Tanks!")
+    else:  # pig
+        target = st.selectbox(
+            "Target Score",
+            options=[50, 100, 250],
+            index=1,
+            key="create_target_score",
+        )
+        st.caption("Don't be a pig! One bad roll takes it all.")
 
     with st.form("create_lobby_form"):
         username = st.text_input(
@@ -140,7 +149,7 @@ def _render_join_form() -> None:
 
             count = player_mgr.count_in_lobby(str(lobby.id))
             # Check max players (2 for Knucklebones, 4 for others)
-            max_players = 2 if lobby.game_mode == "knucklebones" else 4
+            max_players = 2 if lobby.game_mode == "knucklebones" else 10 if lobby.game_mode == "pig" else 4
             if count >= max_players:
                 st.error(f"Lobby is full (max {max_players} players).")
                 return
